@@ -101,7 +101,7 @@ export default function NewExpensePage() {
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Amount (₹)</label>
             <div className="relative">
-              <FiDollarSign className="absolute left-3 top-3.5 text-slate-400" />
+              <FaRupeeSign className="absolute left-3 top-3.5 text-slate-400" />
               <input 
                 type="number" name="amount" required min="1"
                 placeholder="0.00"
