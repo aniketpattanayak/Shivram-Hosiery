@@ -14,7 +14,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: #fffff;
     --foreground: #ededed;
   }
 }
@@ -23,4 +23,29 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+
+
+@layer base {
+  /* Force all inputs to have dark text and white background */
+  input, 
+  textarea, 
+  select {
+    color: #171717 !important;       /* Dark Text */
+    background-color: #ffffff !important; /* White Background */
+  }
+
+  /* Specific fix for number inputs (sometimes they act weird) */
+  input[type="number"] {
+    color: #171717 !important;
+  }
+  
+  /* Ensure the text is visible when auto-filled by browser */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover, 
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #171717 !important;
+    -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  }
 }
