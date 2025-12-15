@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import axios from "axios";
+import api from '@/utils/api';
 import {
   FiDownload,
   FiFilter,
@@ -20,12 +21,12 @@ export default function ReportsPage() {
     setLoading(true);
     setHasSearched(true); // User clicked the button
     try {
-      let url = `http://localhost:2121/api/reports/${reportType}`;
+      let url = `/reports/${reportType}`;
       if (dates.start && dates.end) {
         url += `?startDate=${dates.start}&endDate=${dates.end}`;
       }
 
-      const res = await axios.get(url);
+      const res = await api.get(url);
       setData(res.data);
     } catch (error) {
       console.error(error);

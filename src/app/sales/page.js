@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import Link from "next/link";
+import api from '@/utils/api';
 import {
   FiPlus,
   FiUser,
@@ -34,7 +35,7 @@ export default function SalesPage() {
   const fetchLeads = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:2121/api/sales/leads");
+      const res = await api.get("/sales/leads");
       setLeads(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error(error);
@@ -47,7 +48,7 @@ export default function SalesPage() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:2121/api/sales/orders");
+      const res = await api.get("/sales/orders");
       setOrders(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error(error);
@@ -60,7 +61,7 @@ export default function SalesPage() {
   const fetchQuotes = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:2121/api/sales/quotes");
+      const res = await api.get("/sales/quotes");
       setQuotes(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error(error);
@@ -74,7 +75,7 @@ export default function SalesPage() {
   const fetchExpenses = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:2121/api/sales/expenses");
+      const res = await api.get("/sales/expenses");
       setExpenses(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error(error);
@@ -87,7 +88,7 @@ export default function SalesPage() {
   // 🟢 NEW: Approve/Reject Logic
   const handleExpenseStatus = async (id, status) => {
     try {
-      await axios.put(`http://localhost:2121/api/sales/expenses/${id}/status`, {
+      await api.put(`/sales/expenses/${id}/status`, {
         status,
       });
       fetchExpenses(); // Refresh list immediately

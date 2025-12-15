@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { FiCheckCircle, FiXCircle, FiClipboard, FiActivity, FiFilter, FiSearch } from 'react-icons/fi';
 import QCModal from './QCModal';
+import api from '@/utils/api';
 
 export default function QCPage() {
   const [jobs, setJobs] = useState([]);
@@ -12,7 +13,7 @@ export default function QCPage() {
   const fetchJobs = async () => {
     try {
       // FIX: Fetch specifically from the QC endpoint
-      const res = await axios.get('http://localhost:2121/api/quality/pending');
+      const res = await api.get('/quality/pending');
       setJobs(res.data);
     } catch (error) {
       console.error(error);

@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { FiCalendar, FiFileText, FiSave, FiArrowLeft, FiTag } from 'react-icons/fi';
 import { FaRupeeSign } from "react-icons/fa";
+import api from '@/utils/api';
 
 export default function NewExpensePage() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function NewExpensePage() {
     setLoading(true);
 
     try {
-      await axios.post('http://localhost:2121/api/sales/expenses', {
+      await api.post('/sales/expenses', {
         ...formData,
         salesPerson: user.name
       });

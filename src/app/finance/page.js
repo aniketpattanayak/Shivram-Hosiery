@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import Link from "next/link"; // 🟢 Added Link import
+import api from '@/utils/api';
 import {
   FiFileText,
   FiDollarSign,
@@ -24,13 +25,13 @@ export default function FinancePage() {
     setLoading(true);
     try {
       if (activeTab === "invoices") {
-        const res = await axios.get(
-          "http://localhost:2121/api/finance/invoices"
+        const res = await api.get(
+          "/finance/invoices"
         );
         setInvoices(res.data);
       } else {
-        const res = await axios.get(
-          "http://localhost:2121/api/finance/pending"
+        const res = await api.get(
+          "/finance/pending"
         );
         setPendingOrders(res.data);
       }
@@ -44,7 +45,7 @@ export default function FinancePage() {
   const generateInvoice = async (orderId) => {
     if (!confirm("Generate Invoice for this order?")) return;
     try {
-      await axios.post("http://localhost:2121/api/finance/create", { orderId });
+      await api.post("/finance/create", { orderId });
       alert("✅ Invoice Generated!");
       setActiveTab("invoices"); // Switch to invoice view
     } catch (error) {
@@ -54,7 +55,7 @@ export default function FinancePage() {
 
   const markPaid = async (id) => {
     try {
-      await axios.put(`http://localhost:2121/api/finance/${id}/pay`);
+      await api.put(`/finance/${id}/pay`);
       fetchData(); // Refresh
     } catch (error) {
       console.error(error);

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import api from '@/utils/api';
 import { FiBox, FiScissors, FiLayers, FiCheckCircle, FiTruck, FiArrowRight, FiX } from 'react-icons/fi';
 
 export default function ShopFloorPage() {
@@ -16,7 +17,7 @@ export default function ShopFloorPage() {
 
   const fetchData = async () => {
     try {
-        const res = await axios.get('http://localhost:2121/api/shopfloor');
+        const res = await api.get('/shopfloor');
         setJobs(res.data);
         setLoading(false);
     } catch (e) { console.error(e); }
@@ -28,7 +29,7 @@ export default function ShopFloorPage() {
     if(!confirm("Confirm Issue Material? System will auto-allocate oldest stock (FIFO).")) return;
     
     try {
-        const res = await axios.post('http://localhost:2121/api/shopfloor/issue', { jobId });
+        const res = await api.post('/shopfloor/issue', { jobId });
         
         // 2. Save the Picking List to State (Instead of Alert)
         if (res.data.pickingList) {
@@ -48,14 +49,14 @@ export default function ShopFloorPage() {
 
   const receiveCutting = async (jobId) => {
     try {
-        await axios.post('http://localhost:2121/api/shopfloor/receive', { jobId, nextStage: 'Sewing_Started' });
+        await api.post('/shopfloor/receive', { jobId, nextStage: 'Sewing_Started' });
         fetchData();
     } catch (error) { alert("Error receiving"); }
   };
 
   const receiveSewing = async (jobId) => {
     try {
-        await axios.post('http://localhost:2121/api/shopfloor/receive', { jobId, nextStage: 'QC_Pending' });
+        await api.post('/shopfloor/receive', { jobId, nextStage: 'QC_Pending' });
         fetchData();
     } catch (error) { alert("Error receiving"); }
   };

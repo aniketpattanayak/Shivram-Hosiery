@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { FiTruck, FiMapPin, FiPackage, FiCheckCircle, FiClock, FiSearch } from 'react-icons/fi';
+import api from '@/utils/api';
 
 export default function DispatchPage() {
   const [orders, setOrders] = useState([]);
@@ -11,7 +12,7 @@ export default function DispatchPage() {
   const fetchOrders = async () => {
     try {
       // Connects to Backend Port 2121
-      const res = await axios.get('http://localhost:2121/api/inventory/orders');
+      const res = await api.get('/inventory/orders');
       setOrders(res.data);
     } catch (error) {
       console.error(error);
@@ -41,7 +42,7 @@ export default function DispatchPage() {
     if (!confirm("Confirm Shipment? Stock will be permanently deducted.")) return;
 
     try {
-      await axios.post('http://localhost:2121/api/inventory/ship', {
+      await api.post('/inventory/ship', {
         orderId: orderId, // Note: We need the String ID (e.g. SO-1001)
         transportDetails: details
       });

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import axios from "axios";
+import api from '@/utils/api';
 import Link from "next/link"; // 🟢 Import Link for Quick Actions
 import {
   FiGrid,
@@ -85,7 +86,7 @@ export default function Dashboard() {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:2121/api/dashboard/stats");
+      const res = await api.get("/dashboard/stats");
       setData(res.data);
     } catch (error) {
       console.error("Error fetching stats:", error);

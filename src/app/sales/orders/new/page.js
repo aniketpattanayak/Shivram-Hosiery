@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import axios from "axios";
+import api from '@/utils/api';
 import {
   FiPlus,
   FiTrash2,
@@ -115,7 +116,7 @@ export default function NewOrderPage() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await axios.get("http://localhost:2121/api/products");
+        const res = await api.get("/products");
         setProducts(res.data);
       } catch (error) {
         console.error("Failed to load products");
@@ -154,8 +155,8 @@ export default function NewOrderPage() {
     setLoading(true);
     setStatus({ type: "", msg: "" });
     try {
-      const res = await axios.post(
-        "http://localhost:2121/api/sales/orders",
+      const res = await api.post(
+        "/sales/orders",
         formData
       );
       if (res.data.success) {

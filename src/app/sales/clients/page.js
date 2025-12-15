@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
+import api from '@/utils/api';
 import { FiUser, FiMapPin, FiCreditCard, FiSave, FiSearch, FiPlus, FiArrowLeft } from 'react-icons/fi';
 
 export default function ClientsPage() {
@@ -30,7 +31,7 @@ export default function ClientsPage() {
 
   const fetchClients = async () => {
     try {
-      const res = await axios.get('http://localhost:2121/api/sales/clients');
+      const res = await api.get('/sales/clients');
       setClients(res.data);
     } catch (error) {
       console.error(error);
@@ -41,7 +42,7 @@ export default function ClientsPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await axios.post('http://localhost:2121/api/sales/clients', formData);
+      await api.post('/sales/clients', formData);
       alert("✅ Customer Added Successfully!");
       setView('list');
       fetchClients(); // Refresh list

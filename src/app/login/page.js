@@ -3,6 +3,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { FiLock, FiMail, FiArrowRight } from 'react-icons/fi';
+import api from '@/utils/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const res = await axios.post('http://localhost:2121/api/auth/login', formData);
+      const res = await api.post('/auth/login', formData);
       
       // Save User Data to Browser Storage
       localStorage.setItem('userInfo', JSON.stringify(res.data));

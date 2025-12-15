@@ -2,6 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import axios from "axios";
+import api from '@/utils/api';
 import {
   FiBox,
   FiTruck,
@@ -38,8 +39,8 @@ const ReceiveModal = ({ order, onClose, onSuccess }) => {
       setLoading(true);
       try {
         // CALL THE BACKEND ROUTE
-        await axios.put(
-          `http://localhost:2121/api/procurement/receive/${order._id}`,
+        await api.put(
+          `procurement/receive/${order._id}`,
           {
             qtyReceived: qtyToReceive,
             itemType: order.itemType, // Pass the type for correct stock update
@@ -145,8 +146,8 @@ export default function ReceiveStockPage() {
   const fetchOrders = async () => {
     try {
       // CALL THE BACKEND ROUTE
-      const res = await axios.get(
-        "http://localhost:2121/api/procurement/open-orders"
+      const res = await api.get(
+        "/procurement/open-orders"
       );
       setOrders(res.data);
     } catch (error) {

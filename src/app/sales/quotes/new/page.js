@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
+import api from '@/utils/api';
 import { 
   FiSave, FiPlus, FiTrash2, FiUser, FiBox, 
   FiFileText, FiArrowLeft, FiCreditCard 
@@ -36,8 +37,8 @@ export default function NewQuotePage() {
     const fetchData = async () => {
       try {
         const [clientsRes, productsRes] = await Promise.all([
-          axios.get('http://localhost:2121/api/sales/clients'),
-          axios.get('http://localhost:2121/api/products')
+          api.get('/sales/clients'),
+          api.get('/products')
         ]);
         setClients(clientsRes.data);
         setProducts(productsRes.data);
@@ -121,7 +122,7 @@ export default function NewQuotePage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await axios.post('http://localhost:2121/api/sales/quotes', formData);
+      await api.post('/sales/quotes', formData);
       alert("✅ Quotation Generated Successfully!");
       router.push('/sales'); // Go back to Sales Hub
     } catch (error) {

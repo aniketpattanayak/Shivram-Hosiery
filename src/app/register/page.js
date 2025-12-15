@@ -3,6 +3,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { FiUser, FiLock, FiMail, FiShield } from 'react-icons/fi';
+import api from '@/utils/api';
 
 export default function RegisterPage() {
   const router = useRouter();

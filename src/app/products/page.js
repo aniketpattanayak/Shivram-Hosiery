@@ -10,6 +10,7 @@ import {
   FiX, // Added for Modal
 } from "react-icons/fi";
 import { FaRupeeSign } from "react-icons/fa";
+import api from '@/utils/api';
 
 export default function ProductMasterPage() {
   // --- EXISTING STATE ---
@@ -47,10 +48,10 @@ export default function ProductMasterPage() {
     try {
       // 🟢 Updated to fetch Products, Stock, Categories, and Attributes
       const [prodRes, matRes, catRes, attrRes] = await Promise.all([
-        axios.get("http://localhost:2121/api/products"),
-        axios.get("http://localhost:2121/api/inventory/stock"),
-        axios.get("http://localhost:2121/api/master/categories"),
-        axios.get("http://localhost:2121/api/master/attributes"),
+        api.get("/products"),
+        api.get("/inventory/stock"),
+        api.get("/master/categories"),
+        api.get("/master/attributes"),
       ]);
 
       setProducts(prodRes.data);
@@ -66,7 +67,7 @@ export default function ProductMasterPage() {
   const deleteProduct = async (id) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
     try {
-      await axios.delete(`http://localhost:2121/api/products/${id}`);
+      await api.delete(`/products/${id}`);
       alert("Product Deleted");
       fetchData();
     } catch (error) {
@@ -93,8 +94,8 @@ export default function ProductMasterPage() {
     if (!newItemValue.trim()) return;
     try {
       if (showModal === "category") {
-        const res = await axios.post(
-          "http://localhost:2121/api/master/categories",
+        const res = await api.post(
+          "/master/categories",
           { name: newItemValue }
         );
         setCategories([...categories, res.data]);
@@ -104,8 +105,8 @@ export default function ProductMasterPage() {
         const currentCat = categories.find((c) => c.name === formData.category);
         if (!currentCat) return alert("Select a Category first");
 
-        const res = await axios.post(
-          "http://localhost:2121/api/master/categories/sub",
+        const res = await api.post(
+          "/master/categories/sub",
           {
             categoryId: currentCat._id,
             subCategory: newItemValue,
@@ -120,15 +121,15 @@ export default function ProductMasterPage() {
         setAvailableSubCats(res.data.subCategories);
         setFormData({ ...formData, subCategory: newItemValue });
       } else if (showModal === "fabric") {
-        const res = await axios.post(
-          "http://localhost:2121/api/master/attributes",
+        const res = await api.post(
+          "/master/attributes",
           { type: "fabric", value: newItemValue }
         );
         setFabrics([...fabrics, res.data.value]);
         setFormData({ ...formData, fabricType: newItemValue });
       } else if (showModal === "color") {
-        const res = await axios.post(
-          "http://localhost:2121/api/master/attributes",
+        const res = await api.post(
+          "/master/attributes",
           { type: "color", value: newItemValue }
         );
         setColors([...colors, res.data.value]);
@@ -168,7 +169,7 @@ export default function ProductMasterPage() {
     if (!formData.sku) return alert("SKU is required");
 
     try {
-      await axios.post("http://localhost:2121/api/products", formData);
+      await api.post("/products", formData);
       alert("Product Created Successfully!");
       setShowForm(false);
       setFormData({

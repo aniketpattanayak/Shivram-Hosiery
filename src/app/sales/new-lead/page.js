@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { FiUser, FiMapPin, FiPhone, FiBox, FiSave, FiArrowLeft } from 'react-icons/fi';
 import { FaRupeeSign } from "react-icons/fa";
+import api from '@/utils/api';
 
 export default function NewLeadPage() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function NewLeadPage() {
     // 2. Fetch Products (for Dropdown)
     const fetchProducts = async () => {
       try {
-        const res = await axios.get('http://localhost:2121/api/products');
+        const res = await api.get('/products');
         setProducts(res.data);
       } catch (err) { console.error(err); }
     };
@@ -49,7 +50,7 @@ export default function NewLeadPage() {
     setLoading(true);
 
     try {
-      await axios.post('http://localhost:2121/api/sales/leads', {
+      await api.post('/sales/leads', {
         ...formData,
         salesPerson: user.name
       });

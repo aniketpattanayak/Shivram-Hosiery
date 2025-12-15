@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import api from '@/utils/api';
 import { FiUser, FiTrash2, FiEdit2, FiShield, FiCheckSquare, FiSquare, FiSave, FiX } from 'react-icons/fi';
 
 // 🟢 1. Define Default Presets (To make your life easier)
@@ -53,7 +54,7 @@ export default function SettingsPage() {
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get('http://localhost:2121/api/users');
+      const res = await api.get('/users');
       setUsers(res.data);
     } catch (error) { console.error(error); }
   };
@@ -88,11 +89,11 @@ export default function SettingsPage() {
     try {
       if (isEditing) {
         // Update Existing User
-        await axios.put(`http://localhost:2121/api/users/${editId}`, formData);
+        await api.put(`/users/${editId}`, formData);
         alert("✅ User Updated Successfully!");
       } else {
         // Create New User
-        await axios.post('http://localhost:2121/api/users', formData);
+        await api.post('/users', formData);
         alert("✅ User Created Successfully!");
       }
       
@@ -128,7 +129,7 @@ export default function SettingsPage() {
   const handleDelete = async (id) => {
     if(!confirm("Are you sure? This action cannot be undone.")) return;
     try {
-      await axios.delete(`http://localhost:2121/api/users/${id}`);
+      await api.delete(`/users/${id}`);
       fetchUsers();
     } catch (error) { alert("Failed to delete"); }
   };

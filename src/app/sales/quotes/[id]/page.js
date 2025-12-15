@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useRouter } from 'next/navigation';
 import { FiPrinter, FiArrowLeft, FiDownload } from 'react-icons/fi';
+import api from '@/utils/api';
 
 export default function ViewQuotePage() {
   const { id } = useParams();
@@ -13,7 +14,7 @@ export default function ViewQuotePage() {
   useEffect(() => {
     const fetchQuote = async () => {
       try {
-        const res = await axios.get(`http://localhost:2121/api/sales/quotes/${id}`);
+        const res = await api.get(`/sales/quotes/${id}`);
         setQuote(res.data);
       } catch (error) {
         alert("Error fetching quotation");

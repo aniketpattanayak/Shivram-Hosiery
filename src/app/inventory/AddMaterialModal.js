@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { FiX, FiSave, FiPlus } from "react-icons/fi";
+import api from '@/utils/api';
 
 export default function AddMaterialModal({ onClose, onSuccess }) {
   // 🟢 Form Data State
@@ -36,8 +37,8 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
 
   const fetchAttributes = async () => {
     try {
-      const res = await axios.get(
-        "http://localhost:2121/api/master/attributes"
+      const res = await api.get(
+        "/master/attributes"
       );
       const allAttrs = res.data;
       setMaterialTypes(allAttrs.materialType || ["Fabric", "Thread"]);
@@ -51,8 +52,8 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
   const handleQuickAddSubmit = async () => {
     if (!newItemValue.trim()) return;
     try {
-      const res = await axios.post(
-        "http://localhost:2121/api/master/attributes",
+      const res = await api.post(
+        "/master/attributes",
         {
           type: showQuickAdd,
           value: newItemValue,
@@ -92,8 +93,8 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
 
     setLoading(true);
     try {
-      await axios.post(
-        "http://localhost:2121/api/inventory/materials",
+      await api.post(
+        "/inventory/materials",
         formData
       );
       onSuccess();

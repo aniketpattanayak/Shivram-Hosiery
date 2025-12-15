@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { FiX, FiCheckCircle, FiXCircle, FiArrowRight } from 'react-icons/fi';
+import api from '@/utils/api';
 
 export default function QCModal({ job, onClose, onSuccess }) {
   const [passed, setPassed] = useState('');
@@ -20,7 +21,7 @@ export default function QCModal({ job, onClose, onSuccess }) {
     setLoading(true);
     try {
       // Connect to Backend to update Stock
-      await axios.post('http://localhost:2121/api/quality/submit', {
+      await api.post('/quality/submit', {
         jobId: job.jobId,
         qtyPassed,
         qtyRejected

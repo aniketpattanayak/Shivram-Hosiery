@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import api from '@/utils/api';
 import { FiShoppingCart, FiUser, FiPlus, FiX, FiTrash2, FiPhone, FiAlertCircle, FiArrowDown } from 'react-icons/fi';
 
 export default function ProcurementPage() {
@@ -38,10 +39,10 @@ export default function ProcurementPage() {
   const fetchData = async () => {
     try {
         const [vRes, mRes, pRes, tRes] = await Promise.all([
-            axios.get('http://localhost:2121/api/vendors'),
-            axios.get('http://localhost:2121/api/inventory/stock'),
-            axios.get('http://localhost:2121/api/products'),
-            axios.get('http://localhost:2121/api/procurement/trading') // <--- NEW: Fetch Requests
+            api.get('/vendors'),
+            api.get('/inventory/stock'),
+            api.get('/products'),
+            api.get('/procurement/trading') // <--- NEW: Fetch Requests
         ]);
         setVendors(vRes.data);
         setMaterials(mRes.data);
@@ -76,7 +77,7 @@ export default function ProcurementPage() {
     try {
         if (selectedJobId) {
             // --- SCENARIO A: FULFILLING A TRADING REQUEST ---
-            await axios.post('http://localhost:2121/api/procurement/create-trading-po', {
+            await api.post('/procurement/create-trading-po', {
                 jobId: selectedJobId,
                 vendorId: formData.vendor,
                 costPerUnit: Number(formData.unitPrice)
@@ -85,7 +86,7 @@ export default function ProcurementPage() {
             setSelectedJobId(null); // Reset
         } else {
             // --- SCENARIO B: NORMAL MANUAL PURCHASE ---
-            await axios.post('http://localhost:2121/api/procurement/purchase', formData);
+            await api.post('/procurement/purchase', formData);
             alert("Purchase Successful! Stock Updated.");
         }
         
@@ -100,7 +101,7 @@ export default function ProcurementPage() {
   const handleAddVendor = async (e) => {
     e.preventDefault();
     try {
-        await axios.post('http://localhost:2121/api/vendors', newVendor);
+        await api.post('/vendors', newVendor);
         alert("Vendor Added Successfully");
         setShowVendorModal(false);
         setNewVendor({ name: '', category: 'Material Supplier', services: [], phone: '' });
@@ -113,7 +114,7 @@ export default function ProcurementPage() {
   const deleteVendor = async (id) => {
     if(!confirm("Are you sure you want to delete this vendor?")) return;
     try {
-        await axios.delete(`http://localhost:2121/api/vendors/${id}`);
+        await api.delete(`/vendors/${id}`);
         fetchData(); 
     } catch (error) {
         alert("Error deleting vendor");

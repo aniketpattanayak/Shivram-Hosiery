@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { FiScissors, FiCheckCircle, FiTrash2, FiClock, FiLayers, FiList } from 'react-icons/fi';
 import StrategyModal from './StrategyModal';
+import api from '@/utils/api';
 
 export default function ProductionPage() {
   const [plans, setPlans] = useState([]);
@@ -20,7 +21,7 @@ export default function ProductionPage() {
   const fetchPlans = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:2121/api/production/pending');
+      const res = await api.get('/production/pending');
       setPlans(res.data);
     } catch (error) {
       console.error("Error fetching plans:", error);
@@ -32,7 +33,7 @@ export default function ProductionPage() {
   const deletePlan = async (id) => {
     if (!confirm("Delete this plan?")) return;
     try {
-      await axios.delete(`http://localhost:2121/api/production/${id}`);
+      await api.delete(`/production/${id}`);
       fetchPlans();
     } catch (error) {
       alert("Could not delete. Hiding locally.");

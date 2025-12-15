@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import api from '@/utils/api';
 import { 
   FiScissors, FiCheckCircle, FiPlus, FiBox, FiArrowRight, FiTag, FiLayers 
 } from 'react-icons/fi';
@@ -46,7 +47,7 @@ const CreateSampleModal = ({ onClose, onSuccess, products, materials }) => {
     }
 
     try {
-        await axios.post('http://localhost:2121/api/sampling', payload);
+        await api.post('/sampling', payload);
         alert("Sample Created! 🧪");
         onSuccess();
     } catch (error) {
@@ -187,9 +188,9 @@ export default function SamplingPage() {
   const fetchData = async () => {
     try {
         const [sRes, pRes, mRes] = await Promise.all([
-            axios.get('http://localhost:2121/api/sampling'),
-            axios.get('http://localhost:2121/api/products'),
-            axios.get('http://localhost:2121/api/inventory/stock') 
+            api.get('/sampling'),
+            api.get('/products'),
+            api.get('/inventory/stock') 
         ]);
         setSamples(sRes.data);
         setProducts(pRes.data);
@@ -207,7 +208,7 @@ export default function SamplingPage() {
       }
 
       try {
-          await axios.put('http://localhost:2121/api/sampling/status', { sampleId: sample._id, status: nextStage });
+          await api.put('/sampling/status', { sampleId: sample._id, status: nextStage });
           fetchData();
       } catch (e) { alert("Error moving stage"); }
   };
@@ -215,7 +216,7 @@ export default function SamplingPage() {
   const handleIssueMaterial = async (sampleId) => {
       if(!confirm("Deduct materials from Main Inventory?")) return;
       try {
-          await axios.post('http://localhost:2121/api/sampling/issue', { sampleId });
+          await api.post('/sampling/issue', { sampleId });
           alert("Materials Issued! Stock Deducted.");
           fetchData();
       } catch (e) { alert("Stock Error: " + e.response?.data?.msg); }
@@ -226,7 +227,7 @@ export default function SamplingPage() {
       if(!price) return;
       
       try {
-          await axios.post('http://localhost:2121/api/sampling/convert', { sampleId, finalPrice: price });
+          await api.post('/sampling/convert', { sampleId, finalPrice: price });
           alert("🎉 Success! Sample converted to Product Master.");
           fetchData();
       } catch (e) { alert("Error: " + e.response?.data?.msg); }

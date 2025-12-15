@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useRouter } from 'next/navigation';
 import { FiPrinter, FiArrowLeft } from 'react-icons/fi';
+import api from '@/utils/api';
 
 export default function InvoiceView() {
   const { id } = useParams(); 
@@ -17,7 +18,7 @@ export default function InvoiceView() {
 
   const fetchInvoice = async () => {
     try {
-      const res = await axios.get('http://localhost:2121/api/finance/invoices');
+      const res = await api.get('/finance/invoices');
       const found = res.data.find(inv => inv._id === id || inv.invoiceId === id);
       setInvoice(found);
     } catch (error) {

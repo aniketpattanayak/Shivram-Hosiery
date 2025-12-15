@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { FiX, FiCheck } from 'react-icons/fi';
+import api from '@/utils/api';
 
 export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggregatedPlans }) {
   const totalRequired = plan.totalQtyToMake;
@@ -51,7 +52,7 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
         
         const allPlanIds = aggregatedPlans.map(p => p._id);
         
-        await axios.post('http://localhost:2121/api/production/confirm-strategy', {
+        await api.post('/production/confirm-strategy', {
             planIds: allPlanIds, // <--- Sending Array of IDs
             splits: baseSplitArray
         });
@@ -59,7 +60,7 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
       } else {
         // --- NORMAL MODE ---
         // Send Single ID
-        await axios.post('http://localhost:2121/api/production/confirm-strategy', {
+        await api.post('/production/confirm-strategy', {
           planId: validPlanId, // <--- Sending String ID
           splits: baseSplitArray
         });

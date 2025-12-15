@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { FiPlus } from "react-icons/fi";
 import AddMaterialModal from "./AddMaterialModal";
+import api from '@/utils/api';
 
 export default function InventoryPage() {
   const [materials, setMaterials] = useState([]);
@@ -15,7 +16,7 @@ export default function InventoryPage() {
 
   const fetchStock = async () => {
     try {
-      const res = await axios.get("http://localhost:2121/api/inventory/stock");
+      const res = await api.get("/inventory/stock");
       setMaterials(res.data);
     } catch (error) {
       console.error(error);
