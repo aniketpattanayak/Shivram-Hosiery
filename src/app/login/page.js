@@ -38,7 +38,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-10">
           <h1 className="text-3xl font-black text-slate-900 tracking-tighter">
-            FACTORY<span className="text-blue-600">OS</span>
+          Shivram H<span className="text-blue-600">os</span>iery
           </h1>
           <p className="text-slate-400 font-medium mt-2">Sign in to manage operations</p>
         </div>

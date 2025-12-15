@@ -20,7 +20,7 @@ import { PiDress } from "react-icons/pi";
 
 // Base Menu Items (Visible to relevant staff)
 const baseMenuItems = [
-  { name: "Dashboard", href: "/dashboard", icon: FiGrid },
+  { name: "Dashboard", href: "/", icon: FiGrid },
 
   { section: "Commercial" },
   { name: "Product Master", href: "/products", icon: FiLayers },
