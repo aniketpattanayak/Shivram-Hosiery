@@ -21,8 +21,8 @@ export default function NewExpensePage() {
   });
 
   useEffect(() => {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    if (userInfo) setUser(userInfo);
+    const userInfo = localStorage.getItem('userInfo');
+    if (userInfo) setUser(JSON.parse(userInfo));
   }, []);
 
   const handleChange = (e) => {
@@ -39,7 +39,7 @@ export default function NewExpensePage() {
         salesPerson: user.name
       });
       alert("✅ Expense Logged Successfully!");
-      router.push('/sales'); // Go back to Hub
+      router.push('/sales/expenses'); // Redirect to expenses list
     } catch (error) {
       alert("Error: " + (error.response?.data?.msg || error.message));
     } finally {
@@ -48,7 +48,7 @@ export default function NewExpensePage() {
   };
 
   return (
-    <div className="max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 p-6">
       
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import axios from "axios";
-import api from '@/utils/api';
+import api from "@/utils/api";
 import {
   FiPlus,
   FiTrash2,
@@ -46,7 +46,7 @@ const OrderItemRow = ({
         <datalist id={`product-list-${index}`}>
           {productList.map((prod) => (
             <option key={prod._id} value={prod.name}>
-              Category: {prod.category} | Price: ${prod.sellingPrice || 0}
+              Category: {prod.category} | Price: ₹{prod.sellingPrice || 0}
             </option>
           ))}
         </datalist>
@@ -155,10 +155,7 @@ export default function NewOrderPage() {
     setLoading(true);
     setStatus({ type: "", msg: "" });
     try {
-      const res = await api.post(
-        "/sales/orders",
-        formData
-      );
+      const res = await api.post("/sales/orders", formData);
       if (res.data.success) {
         setStatus({
           type: "success",
@@ -183,7 +180,7 @@ export default function NewOrderPage() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 p-6">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
@@ -342,3 +339,5 @@ export default function NewOrderPage() {
     </div>
   );
 }
+
+//final

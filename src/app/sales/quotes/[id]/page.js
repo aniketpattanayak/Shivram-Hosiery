@@ -59,7 +59,7 @@ export default function ViewQuotePage() {
             <p className="text-slate-500 font-medium mt-1"># {quote.quoteId}</p>
           </div>
           <div className="text-right">
-            <h2 className="text-xl font-bold text-slate-800">Sant Wires</h2>
+            <h2 className="text-xl font-bold text-slate-800">Shivram Hosiery</h2>
             <p className="text-sm text-slate-500 max-w-[200px] leading-relaxed mt-1">
               Plot No 45, Industrial Area,<br/>
               Mumbai, Maharashtra - 400001<br/>
@@ -150,7 +150,7 @@ export default function ViewQuotePage() {
           </div>
           <div className="text-right flex flex-col justify-end">
              <div className="h-16"></div> {/* Space for signature */}
-             <p className="font-bold text-slate-900">For Sant Wires</p>
+             <p className="font-bold text-slate-900">For Shivram Hosiery</p>
              <p className="text-xs text-slate-400">Authorized Signatory</p>
           </div>
         </div>
