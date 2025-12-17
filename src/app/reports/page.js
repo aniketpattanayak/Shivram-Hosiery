@@ -2,6 +2,7 @@
 import { useState } from "react";
 import axios from "axios";
 import api from '@/utils/api';
+import AuthGuard from '@/components/AuthGuard';
 import {
   FiDownload,
   FiFilter,
@@ -54,6 +55,7 @@ export default function ReportsPage() {
   };
 
   return (
+    <AuthGuard requiredPermission="reports">
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
         <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -201,5 +203,6 @@ export default function ReportsPage() {
         </div>
       )}
     </div>
+    </AuthGuard>
   );
 }

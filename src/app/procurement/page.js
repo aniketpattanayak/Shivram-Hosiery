@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import api from '@/utils/api';
+import AuthGuard from '@/components/AuthGuard';
 import { FiShoppingCart, FiUser, FiPlus, FiX, FiTrash2, FiPhone, FiAlertCircle, FiArrowDown } from 'react-icons/fi';
 
 export default function ProcurementPage() {
@@ -137,6 +138,7 @@ export default function ProcurementPage() {
   });
 
   return (
+    <AuthGuard requiredPermission="procurement">
     <div className="space-y-8 animate-in fade-in">
         
       {/* Header */}
@@ -405,5 +407,6 @@ export default function ProcurementPage() {
         </div>
       )}
     </div>
+    </AuthGuard>
   );
 }

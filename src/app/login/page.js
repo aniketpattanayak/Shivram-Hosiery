@@ -23,7 +23,7 @@ export default function LoginPage() {
       localStorage.setItem('userInfo', JSON.stringify(res.data));
       
       // Redirect to Dashboard
-      router.push('/dashboard');
+      window.location.href = '/';
     } catch (err) {
       setError(err.response?.data?.msg || 'Login failed');
     } finally {

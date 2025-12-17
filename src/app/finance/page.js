@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import Link from "next/link"; // 🟢 Added Link import
 import api from '@/utils/api';
+import AuthGuard from '@/components/AuthGuard';
 import {
   FiFileText,
   FiDollarSign,
@@ -63,6 +64,7 @@ export default function FinancePage() {
   };
 
   return (
+    <AuthGuard requiredPermission="finance">
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 border-b border-slate-200 pb-6">
@@ -217,5 +219,6 @@ export default function FinancePage() {
         </div>
       )}
     </div>
+    </AuthGuard>
   );
 }

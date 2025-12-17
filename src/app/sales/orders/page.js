@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import api from "@/utils/api";
+import AuthGuard from '@/components/AuthGuard';
 import {
   FiPlus, FiTrash2, FiCheckCircle, FiPackage, FiSearch,
   FiArrowDownCircle, FiFileText, FiMinus, FiSave, FiAlertCircle,
@@ -163,6 +164,7 @@ export default function SalesOrdersPage() {
   };
 
   return (
+    <AuthGuard requiredPermission="sales_orders">
     <div className="space-y-12 animate-in fade-in duration-500 p-6">
       
       {/* ========================================= */}
@@ -314,5 +316,6 @@ export default function SalesOrdersPage() {
       </div>
 
     </div>
+    </AuthGuard>
   );
 }

@@ -5,6 +5,7 @@ import axios from 'axios';
 import { FiScissors, FiCheckCircle, FiTrash2, FiClock, FiLayers, FiList } from 'react-icons/fi';
 import StrategyModal from './StrategyModal';
 import api from '@/utils/api';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function ProductionPage() {
   const [plans, setPlans] = useState([]);
@@ -81,6 +82,7 @@ export default function ProductionPage() {
   };
 
   return (
+    <AuthGuard requiredPermission="production">
     <div className="space-y-8 animate-in fade-in duration-500">
       
       {/* Header */}
@@ -212,5 +214,6 @@ export default function ProductionPage() {
         />
       )}
     </div>
+    </AuthGuard>
   );
 }

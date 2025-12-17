@@ -4,6 +4,7 @@ import axios from "axios";
 import { FiPlus } from "react-icons/fi";
 import AddMaterialModal from "./AddMaterialModal";
 import api from '@/utils/api';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function InventoryPage() {
   const [materials, setMaterials] = useState([]);
@@ -60,6 +61,7 @@ export default function InventoryPage() {
   };
 
   return (
+    <AuthGuard requiredPermission="inventory">
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 border-b border-slate-200 pb-6">
@@ -182,5 +184,6 @@ export default function InventoryPage() {
         />
       )}
     </div>
+    </AuthGuard>
   );
 }

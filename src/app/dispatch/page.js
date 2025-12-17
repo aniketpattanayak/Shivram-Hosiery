@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { FiTruck, FiMapPin, FiPackage, FiCheckCircle, FiClock, FiSearch } from 'react-icons/fi';
 import api from '@/utils/api';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function DispatchPage() {
   const [orders, setOrders] = useState([]);
@@ -54,6 +55,7 @@ export default function DispatchPage() {
   };
 
   return (
+    <AuthGuard requiredPermission="dispatch">
     <div className="space-y-8 animate-in fade-in duration-500">
       
       {/* Header */}
@@ -185,5 +187,6 @@ export default function DispatchPage() {
         </div>
       )}
     </div>
+    </AuthGuard>
   );
 }

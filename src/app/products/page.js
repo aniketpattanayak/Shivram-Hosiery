@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import AuthGuard from '@/components/AuthGuard';
 import axios from "axios";
 import {
   FiPlus,
@@ -193,6 +194,7 @@ export default function ProductMasterPage() {
     "w-full bg-white border border-slate-300 rounded-xl p-3 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400";
 
   return (
+    <AuthGuard requiredPermission="products">
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex justify-between items-end border-b border-slate-200 pb-5">
         <div>
@@ -625,5 +627,6 @@ export default function ProductMasterPage() {
         ))}
       </div>
     </div>
+    </AuthGuard>
   );
 }

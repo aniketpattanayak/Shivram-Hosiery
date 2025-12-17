@@ -4,6 +4,7 @@ import axios from 'axios';
 import { FiCheckCircle, FiXCircle, FiClipboard, FiActivity, FiFilter, FiSearch } from 'react-icons/fi';
 import QCModal from './QCModal';
 import api from '@/utils/api';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function QCPage() {
   const [jobs, setJobs] = useState([]);
@@ -27,6 +28,7 @@ export default function QCPage() {
   }, []);
 
   return (
+    <AuthGuard requiredPermission="qc">
     <div className="space-y-8 animate-in fade-in duration-500">
       
       {/* Header */}
@@ -138,5 +140,6 @@ export default function QCPage() {
         />
       )}
     </div>
+    </AuthGuard>
   );
 }

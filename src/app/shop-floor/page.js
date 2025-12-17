@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import api from "@/utils/api";
+import AuthGuard from '@/components/AuthGuard';
 import {
   FiBox,
   FiScissors,
@@ -155,6 +156,7 @@ export default function ShopFloorPage() {
   ];
 
   return (
+    <AuthGuard requiredPermission="shop-floor">
     <div className="space-y-6 animate-in fade-in">
       <div className="border-b border-slate-200 pb-6 flex justify-between items-end">
         <div>
@@ -505,5 +507,6 @@ export default function ShopFloorPage() {
         </div>
       )}
     </div>
+    </AuthGuard>
   );
 }

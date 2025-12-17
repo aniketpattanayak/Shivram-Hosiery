@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import api from '@/utils/api';
 import Link from "next/link"; // 🟢 Import Link for Quick Actions
+import AuthGuard from '@/components/AuthGuard';
 import {
   FiGrid,
   FiActivity,
@@ -100,6 +101,7 @@ export default function Dashboard() {
   }, []);
 
   return (
+    <AuthGuard requiredPermission="dashboard">
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 border-b border-slate-200 pb-6">
@@ -126,28 +128,6 @@ export default function Dashboard() {
             System Live
           </span>
         </div>
-      </div>
-
-      {/* 🟢 Quick Actions Bar (New Addition) */}
-      <div className="flex gap-4 overflow-x-auto pb-2">
-        <Link
-          href="/sales"
-          className="flex items-center gap-2 px-5 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-transform whitespace-nowrap"
-        >
-          <FiPlusCircle /> New Order
-        </Link>
-        <Link
-          href="/production"
-          className="flex items-center gap-2 px-5 py-3 bg-white text-slate-700 font-bold rounded-xl border border-slate-200 hover:border-blue-300 transition-colors whitespace-nowrap"
-        >
-          <FiLayers /> Production Plan
-        </Link>
-        <Link
-          href="/finance"
-          className="flex items-center gap-2 px-5 py-3 bg-white text-slate-700 font-bold rounded-xl border border-slate-200 hover:border-blue-300 transition-colors whitespace-nowrap"
-        >
-          <FiFileText /> View Invoices
-        </Link>
       </div>
 
       {/* KPI Cards Grid */}
@@ -258,5 +238,6 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+    </AuthGuard>
   );
 }

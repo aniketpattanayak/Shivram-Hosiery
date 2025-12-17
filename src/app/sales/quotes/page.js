@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { FiPlus, FiFileText, FiPrinter } from 'react-icons/fi';
 import api from '@/utils/api';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function QuotesPage() {
   const [quotes, setQuotes] = useState([]);
@@ -27,6 +28,7 @@ export default function QuotesPage() {
   }, []);
 
   return (
+    <AuthGuard requiredPermission="sales_quotes">
     <div className="p-6 animate-in fade-in">
       <div className="flex justify-between items-end mb-6">
         <div>
@@ -81,5 +83,6 @@ export default function QuotesPage() {
         </table>
       </div>
     </div>
+    </AuthGuard>
   );
 }

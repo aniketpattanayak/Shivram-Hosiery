@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import AuthGuard from '@/components/AuthGuard';
 import api from "@/utils/api";
 import {
   FiUser, FiMapPin, FiCreditCard, FiSave, FiSearch,
@@ -147,12 +148,10 @@ export default function ClientsPage() {
   );
 
   return (
+    <AuthGuard requiredPermission="sales_clients">
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between border-b border-slate-200 pb-4">
         <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
-            <FiArrowLeft size={24} />
-          </button>
           <div>
             <h1 className="text-2xl font-extrabold text-slate-900">Client Master</h1>
             <p className="text-slate-500 text-sm">Manage customer details and statuses.</p>
@@ -307,5 +306,6 @@ export default function ClientsPage() {
       
       <ActivityModal isOpen={!!selectedClient} client={selectedClient} onClose={() => setSelectedClient(null)} onSuccess={fetchData} />
     </div>
+    </AuthGuard>
   );
 }
