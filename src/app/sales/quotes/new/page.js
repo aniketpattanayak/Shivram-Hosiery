@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation"; // 🟢 Added useSearchParams
 import api from "@/utils/api";
 import {
   FiSave,
@@ -16,6 +16,9 @@ import {
 
 export default function NewQuotePage() {
   const router = useRouter();
+  const searchParams = useSearchParams(); // 🟢 Hook to read URL parameters
+  const preSelectedClientId = searchParams.get("clientId"); // 🟢 Get the ID from URL
+
   const [loading, setLoading] = useState(false);
 
   // Data from DB
@@ -51,7 +54,7 @@ export default function NewQuotePage() {
     },
   });
 
-  // 1. Fetch Master Data
+  // 1. Fetch Master Data & Handle Auto-Select
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -61,6 +64,27 @@ export default function NewQuotePage() {
         ]);
         setClients(clientsRes.data);
         setProducts(productsRes.data);
+
+        // 🟢 AUTO-SYNC LOGIC: If URL has clientId, select it immediately
+        if (preSelectedClientId && clientsRes.data.length > 0) {
+          const foundClient = clientsRes.data.find(
+            (c) => String(c._id) === String(preSelectedClientId)
+          );
+          
+          if (foundClient) {
+            setFormData((prev) => ({
+              ...prev,
+              clientId: foundClient._id,
+              clientName: foundClient.name,
+              clientAddress: foundClient.billToAddress || foundClient.address,
+              clientGst: foundClient.gstNumber || "",
+              terms: {
+                ...prev.terms,
+                payment: foundClient.paymentTerms || prev.terms.payment,
+              },
+            }));
+          }
+        }
 
         const userInfo = localStorage.getItem("userInfo");
         if (userInfo) {
@@ -72,7 +96,7 @@ export default function NewQuotePage() {
       }
     };
     fetchData();
-  }, []);
+  }, [preSelectedClientId]); // 🟢 Re-run if ID changes
 
   // 2. Handle Client Selection
   const handleClientChange = (e) => {
@@ -215,6 +239,7 @@ export default function NewQuotePage() {
               <select
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500/20 outline-none"
                 onChange={handleClientChange}
+                value={formData.clientId} // 🟢 ADDED: Controlled input to show pre-selected client
                 required
               >
                 <option value="">-- Choose from Client Master --</option>

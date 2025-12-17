@@ -13,6 +13,8 @@ import {
   FiSave,
   FiAlertCircle,
   FiSearch,
+  FiArrowDownCircle, 
+  FiFileText         
 } from "react-icons/fi";
 
 // --- Sub-Component: Order Item Row ---
@@ -105,24 +107,40 @@ export default function NewOrderPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: "", msg: "" });
   const [products, setProducts] = useState([]);
+  
+  // 🟢 SYNC STATES
+  const [wonLeads, setWonLeads] = useState([]); 
+  const [clientQuotes, setClientQuotes] = useState([]); 
 
   const [formData, setFormData] = useState({
     customerName: "",
+    customerId: "", // 🟢 This ID is critical for the status update
     deliveryDate: new Date().toISOString().split("T")[0],
     priority: "Medium",
     items: [{ productName: "", qtyOrdered: 1 }],
   });
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const res = await api.get("/products");
-        setProducts(res.data);
-      } catch (error) {
-        console.error("Failed to load products");
+  // 1. Fetch Data
+  const fetchInitData = async () => {
+    try {
+      const [prodRes, leadsRes] = await Promise.all([
+        api.get("/products"),
+        api.get("/sales/clients") // Fetching clients/leads
+      ]);
+      setProducts(prodRes.data);
+      
+      if (leadsRes.data) {
+         // 🟢 FILTER: Only show leads that are "Order Won"
+         const won = leadsRes.data.filter(l => l.status === 'Order Won');
+         setWonLeads(won);
       }
-    };
-    fetchProducts();
+    } catch (error) {
+      console.error("Failed to load data", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitData();
   }, []);
 
   const totalUnits = useMemo(() => {
@@ -131,6 +149,42 @@ export default function NewOrderPage() {
       0
     );
   }, [formData.items]);
+
+  // 🟢 SYNC LEAD -> ORDER FORM
+  const handleConvertLead = async (lead) => {
+    // Save the ID so we know which client to update later
+    setFormData(prev => ({ 
+        ...prev, 
+        customerName: lead.name,
+        customerId: lead._id 
+    }));
+    
+    // Fetch quotes for this client
+    try {
+        const res = await api.get('/sales/quotes'); 
+        const matchedQuotes = res.data.filter(q => q.clientName === lead.name);
+        setClientQuotes(matchedQuotes);
+        
+        if (matchedQuotes.length > 0) {
+            alert(`✅ Synced ${lead.name}! Found ${matchedQuotes.length} quotation(s).`);
+        } else {
+            alert(`✅ Synced ${lead.name}! No quotations found.`);
+        }
+    } catch (e) { console.error("Quote fetch error", e); }
+  };
+
+  // 🟢 SYNC QUOTE -> ORDER ITEMS
+  const handleApplyQuote = (quoteId) => {
+    const selectedQuote = clientQuotes.find(q => q._id === quoteId);
+    if (!selectedQuote) return;
+
+    const mappedItems = selectedQuote.items.map(item => ({
+        productName: item.name,
+        qtyOrdered: item.qty
+    }));
+
+    setFormData(prev => ({ ...prev, items: mappedItems }));
+  };
 
   const handleHeaderChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -155,18 +209,42 @@ export default function NewOrderPage() {
     setLoading(true);
     setStatus({ type: "", msg: "" });
     try {
+      // 1. Create the Order
       const res = await api.post("/sales/orders", formData);
+      
       if (res.data.success) {
+        
+        // 🟢 2. AUTO-UPDATE CLIENT STATUS TO "Customer"
+        if (formData.customerId) {
+            try {
+                // Update status from 'Order Won' -> 'Customer'
+                await api.put(`/sales/clients/${formData.customerId}`, { 
+                    status: 'Customer' 
+                });
+                
+                // 🟢 3. REFRESH DATA IMMEDIATELY
+                // This makes the notification disappear instantly
+                await fetchInitData();
+                
+            } catch (err) {
+                console.error("Failed to update client status", err);
+            }
+        }
+
         setStatus({
           type: "success",
           msg: `Order #${res.data.order.orderId} Created Successfully`,
         });
+        
+        // Reset Form
         setFormData({
           customerName: "",
+          customerId: "",
           deliveryDate: new Date().toISOString().split("T")[0],
           priority: "Medium",
           items: [{ productName: "", qtyOrdered: 1 }],
         });
+        setClientQuotes([]); // Clear quotes
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     } catch (error) {
@@ -181,6 +259,37 @@ export default function NewOrderPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 p-6">
+      
+      {/* 🟢 NOTIFICATION SECTION (Will disappear after submit) */}
+      {wonLeads.length > 0 && (
+        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+                </span>
+                Pending Won Leads (Ready for Order)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {wonLeads.map(lead => (
+                    <div key={lead._id} className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm flex justify-between items-center hover:border-indigo-300 transition-all">
+                        <div>
+                            <p className="font-bold text-slate-800">{lead.name}</p>
+                            <p className="text-xs text-slate-500 font-medium">Status: Won 🏆</p>
+                        </div>
+                        <button 
+                            type="button"
+                            onClick={() => handleConvertLead(lead)}
+                            className="text-xs font-bold bg-slate-900 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 transition-colors flex items-center gap-1 shadow-lg shadow-indigo-100"
+                        >
+                            Create Order <FiArrowDownCircle />
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+      )}
+
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
@@ -227,6 +336,27 @@ export default function NewOrderPage() {
                 required
               />
             </div>
+            
+            {/* 🟢 NEW: LINK QUOTATION DROPDOWN */}
+            {clientQuotes.length > 0 && (
+                <div className="mb-5 bg-purple-50 p-4 rounded-xl border border-purple-100 animate-in fade-in">
+                    <label className="block text-xs font-bold text-purple-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <FiFileText /> Link Quotation (Auto-Fill)
+                    </label>
+                    <select 
+                        onChange={(e) => handleApplyQuote(e.target.value)}
+                        className="w-full bg-white border-purple-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-purple-200"
+                    >
+                        <option value="">-- Select a Quote --</option>
+                        {clientQuotes.map(q => (
+                            <option key={q._id} value={q._id}>
+                                {q.subject} (₹{q.grandTotal})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
             <div className="group mb-5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                 Delivery Date
@@ -339,5 +469,3 @@ export default function NewOrderPage() {
     </div>
   );
 }
-
-//final
