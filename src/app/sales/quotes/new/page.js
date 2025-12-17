@@ -1,6 +1,6 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation"; // 🟢 Added useSearchParams
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/utils/api";
 import {
   FiSave,
@@ -10,14 +10,13 @@ import {
   FiBox,
   FiFileText,
   FiArrowLeft,
-  FiLayers,
-  FiTag,
 } from "react-icons/fi";
 
-export default function NewQuotePage() {
+// 🟢 1. INTERNAL COMPONENT: Contains all the Logic & Search Params
+function NewQuoteContent() {
   const router = useRouter();
-  const searchParams = useSearchParams(); // 🟢 Hook to read URL parameters
-  const preSelectedClientId = searchParams.get("clientId"); // 🟢 Get the ID from URL
+  const searchParams = useSearchParams(); // 🟢 Safe to use here now
+  const preSelectedClientId = searchParams.get("clientId");
 
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +32,6 @@ export default function NewQuotePage() {
     clientGst: "",
     subject: "",
     salesPerson: "Admin",
-    // 🟢 UPDATED ITEM STRUCTURE
     items: [
       {
         name: "",
@@ -54,7 +52,7 @@ export default function NewQuotePage() {
     },
   });
 
-  // 1. Fetch Master Data & Handle Auto-Select
+  // Fetch Master Data & Handle Auto-Select
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -65,7 +63,7 @@ export default function NewQuotePage() {
         setClients(clientsRes.data);
         setProducts(productsRes.data);
 
-        // 🟢 AUTO-SYNC LOGIC: If URL has clientId, select it immediately
+        // AUTO-SYNC LOGIC
         if (preSelectedClientId && clientsRes.data.length > 0) {
           const foundClient = clientsRes.data.find(
             (c) => String(c._id) === String(preSelectedClientId)
@@ -96,9 +94,9 @@ export default function NewQuotePage() {
       }
     };
     fetchData();
-  }, [preSelectedClientId]); // 🟢 Re-run if ID changes
+  }, [preSelectedClientId]);
 
-  // 2. Handle Client Selection
+  // Handle Client Selection
   const handleClientChange = (e) => {
     const selectedClient = clients.find((c) => c._id === e.target.value);
     if (selectedClient) {
@@ -124,21 +122,19 @@ export default function NewQuotePage() {
     }
   };
 
-  // 🟢 3. UPDATED: Handle Product Selection (Auto-fill ALL fields)
+  // Handle Product Selection
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
 
-    // If Product Name changes, find the product and auto-fill details
     if (field === "name") {
       const product = products.find((p) => p.name === value);
       if (product) {
-        // Auto-fill dynamic fields from Product Master
         newItems[index].category = product.category || "";
         newItems[index].subCategory = product.subCategory || "";
         newItems[index].fabricType = product.fabricType || "";
         newItems[index].color = product.color || "";
         newItems[index].rate = product.sellingPrice || 0;
-        newItems[index].description = product.description || ""; // Optional: fill desc if you have it
+        newItems[index].description = product.description || "";
       }
     }
 
@@ -149,7 +145,6 @@ export default function NewQuotePage() {
   const addItem = () => {
     setFormData((prev) => ({
       ...prev,
-      // Add empty item with all keys
       items: [
         ...prev.items,
         {
@@ -173,7 +168,6 @@ export default function NewQuotePage() {
     setFormData({ ...formData, items: newItems });
   };
 
-  // 4. Calculate Totals
   const totals = useMemo(() => {
     let subTotal = 0;
     let taxAmount = 0;
@@ -187,7 +181,6 @@ export default function NewQuotePage() {
     return { subTotal, taxAmount, grandTotal: subTotal + taxAmount };
   }, [formData.items]);
 
-  // 5. Submit Form
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -239,7 +232,7 @@ export default function NewQuotePage() {
               <select
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500/20 outline-none"
                 onChange={handleClientChange}
-                value={formData.clientId} // 🟢 ADDED: Controlled input to show pre-selected client
+                value={formData.clientId}
                 required
               >
                 <option value="">-- Choose from Client Master --</option>
@@ -292,7 +285,7 @@ export default function NewQuotePage() {
           </div>
         </div>
 
-        {/* 🟢 SECTION 2: ITEMS TABLE (Dynamic Columns) */}
+        {/* SECTION 2: ITEMS TABLE */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -318,7 +311,6 @@ export default function NewQuotePage() {
               >
                 {/* Row 1: Product Search & Basic Specs */}
                 <div className="flex flex-col md:flex-row gap-4">
-                  {/* Product Search */}
                   <div className="w-full md:w-1/3">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
                       Product
@@ -340,7 +332,6 @@ export default function NewQuotePage() {
                     </datalist>
                   </div>
 
-                  {/* Auto-filled Specs (Read Only visually, but editable if needed) */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 w-full">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
@@ -549,5 +540,14 @@ export default function NewQuotePage() {
         </div>
       </form>
     </div>
+  );
+}
+
+// 🟢 2. MAIN PAGE: Wraps content in Suspense to fix Build Error
+export default function NewQuotePage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center text-slate-400">Loading Quotation Form...</div>}>
+      <NewQuoteContent />
+    </Suspense>
   );
 }
