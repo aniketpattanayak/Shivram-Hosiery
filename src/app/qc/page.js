@@ -1,145 +1,260 @@
-'use client';
-import { useEffect, useState } from 'react';
-import axios from 'axios';
-import { FiCheckCircle, FiXCircle, FiClipboard, FiActivity, FiFilter, FiSearch } from 'react-icons/fi';
-import QCModal from './QCModal';
-import api from '@/utils/api';
-import AuthGuard from '@/components/AuthGuard';
+"use client";
+import { useState, useEffect } from "react";
+import api from "@/utils/api";
+import { 
+  FiCheckCircle, FiActivity, FiUserCheck, FiBox
+} from "react-icons/fi";
 
-export default function QCPage() {
+export default function QualityPage() {
   const [jobs, setJobs] = useState([]);
-  const [selectedJob, setSelectedJob] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [inspectorName, setInspectorName] = useState("Loading...");
 
-  const fetchJobs = async () => {
+  // Modal State
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [formData, setFormData] = useState({
+    sampleSize: "",
+    qtyRejected: "",
+    notes: ""
+  });
+  
+  const [stats, setStats] = useState({
+    defectRate: "0.00",
+    projectedPass: 0,
+    status: "Pending"
+  });
+
+  useEffect(() => {
+    fetchPendingJobs();
+    const user = JSON.parse(localStorage.getItem("userInfo"));
+    if (user) setInspectorName(user.name);
+  }, []);
+
+  const fetchPendingJobs = async () => {
     try {
-      // FIX: Fetch specifically from the QC endpoint
-      const res = await api.get('/quality/pending');
+      const res = await api.get("/quality/pending");
       setJobs(res.data);
     } catch (error) {
-      console.error(error);
+      console.error("Error fetching jobs:", error);
     } finally {
       setLoading(false);
     }
   };
 
+  // 🟢 FIX 1: CALCULATOR LOGIC (Updated Variable Name)
   useEffect(() => {
-    fetchJobs();
-  }, []);
+    if (!selectedJob) return;
+
+    // Look for 'totalQty' first (based on your old data), then fallbacks
+    const total = selectedJob.totalQty || selectedJob.targetQuantity || selectedJob.quantity || 0;
+    
+    const sample = Number(formData.sampleSize) || 0;
+    const rejected = Number(formData.qtyRejected) || 0;
+
+    let rate = 0;
+    if (sample > 0) rate = (rejected / sample) * 100;
+
+    let passed = total - rejected;
+    if (passed < 0) passed = 0;
+
+    let statusRec = "Excellent";
+    if (rate > 0) statusRec = "Rectification Required";
+    if (rate > 10) statusRec = "⚠️ High Failure Rate";
+
+    setStats({
+        defectRate: rate.toFixed(2),
+        projectedPass: passed,
+        status: statusRec
+    });
+
+  }, [formData.sampleSize, formData.qtyRejected, selectedJob]);
+
+
+  const handleSubmit = async () => {
+    const sample = Number(formData.sampleSize);
+    const rejected = Number(formData.qtyRejected);
+
+    if (!sample || sample <= 0) return alert("Please enter a valid Sample Size");
+    if (rejected > sample) return alert("Rejected quantity cannot be more than Sample Size!");
+
+    if(!confirm(`Confirm QC Results?\n\n• Inspector: ${inspectorName}\n• Approved: ${stats.projectedPass} units`)) return;
+
+    try {
+      await api.post("/quality/submit", {
+        jobId: selectedJob.jobId,
+        sampleSize: sample,
+        qtyRejected: rejected,
+        notes: formData.notes
+      });
+
+      alert("✅ QC Submitted Successfully!");
+      setSelectedJob(null);
+      setFormData({ sampleSize: "", qtyRejected: "", notes: "" });
+      fetchPendingJobs();
+    } catch (error) {
+      alert("Error: " + (error.response?.data?.msg || error.message));
+    }
+  };
 
   return (
-    <AuthGuard requiredPermission="qc">
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="p-6 max-w-[1600px] mx-auto min-h-screen bg-white">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 border-b border-slate-200 pb-6">
+      <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-6">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Quality Control</h1>
-          <p className="text-slate-500 mt-2 text-sm font-medium">Inspect finished goods and authorize warehouse transfer.</p>
+          <h1 className="text-2xl font-black text-slate-900">Quality Control Log</h1>
+          <p className="text-slate-500 text-sm mt-1">Pending inspections and batch approvals.</p>
         </div>
-        
-        {/* Search / Filter Toolbar */}
-        <div className="flex gap-3">
-          <div className="relative group">
-            <FiSearch className="absolute left-3 top-3 text-slate-400 group-focus-within:text-blue-500" />
-            <input 
-              type="text" 
-              placeholder="Search Job ID..." 
-              className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all w-64"
-            />
-          </div>
-          <button className="p-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors">
-            <FiFilter />
-          </button>
+        <div className="flex items-center gap-4">
+            <div className="bg-slate-50 px-4 py-2 rounded-lg border border-slate-200 flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-bold text-slate-600">Inspector: {inspectorName}</span>
+            </div>
         </div>
       </div>
 
-      {loading ? (
-        <div className="p-20 text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-900 mx-auto mb-4"></div>
-          <p className="text-slate-400 font-medium">Loading Inspections...</p>
-        </div>
-      ) : jobs.length === 0 ? (
-        <div className="bg-white p-16 rounded-3xl border border-slate-100 shadow-sm text-center flex flex-col items-center">
-          <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-4">
-            <FiClipboard size={32} />
-          </div>
-          <h3 className="text-lg font-bold text-slate-900">No Inspections Pending</h3>
-          <p className="text-slate-500 mt-2 max-w-xs mx-auto">The production floor is clear. Great work!</p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {jobs.map((job) => {
-            // FIX: Robust Name Lookup (Batch vs Normal)
-            const productName = job.productId?.name || job.planId?.product?.name || 'Unknown Item';
-            
-            return (
-              <div key={job._id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-6 group">
-                
-                {/* Left: Job Info */}
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="bg-slate-100 text-slate-600 text-[11px] font-bold px-2 py-1 rounded-md uppercase tracking-wider">
-                      {job.jobId}
-                    </span>
-                    
-                    {/* Display Type Badge */}
-                    {job.isBatch ? (
-                       <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded border border-purple-200">
-                           BATCH
-                       </span>
-                    ) : (
-                       <span className={`text-[10px] font-bold px-2 py-1 rounded ${job.type==='In-House'?'bg-blue-50 text-blue-600':'bg-amber-50 text-amber-600'}`}>
-                           {job.type}
-                       </span>
-                    )}
+      {/* Table View */}
+      <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+        <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs border-b border-slate-200">
+                <tr>
+                    <th className="p-4 w-32">Job ID</th>
+                    <th className="p-4 w-32">Date</th>
+                    <th className="p-4">Product Details</th>
+                    <th className="p-4">SKU</th>
+                    <th className="p-4 text-center bg-blue-50/50">Total Batch Qty</th>
+                    <th className="p-4">Client</th>
+                    <th className="p-4 text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                    <tr><td colSpan="7" className="p-8 text-center text-slate-400">Loading Data...</td></tr>
+                ) : jobs.length === 0 ? (
+                    <tr><td colSpan="7" className="p-8 text-center text-slate-400 font-medium">No pending jobs found.</td></tr>
+                ) : (
+                    jobs.map((job) => (
+                        <tr key={job._id} className="hover:bg-slate-50 transition-colors group">
+                            <td className="p-4 font-mono text-blue-600 font-bold">{job.jobId}</td>
+                            <td className="p-4 text-slate-500">{new Date(job.createdAt).toLocaleDateString()}</td>
+                            <td className="p-4">
+                                <span className="font-bold text-slate-800 block">
+                                    {job.productId?.name || job.planId?.product?.name || "Unknown Item"}
+                                </span>
+                            </td>
+                            <td className="p-4 font-mono text-slate-500 text-xs">{job.productId?.sku || "N/A"}</td>
+                            
+                            {/* 🟢 FIX 2: TABLE DISPLAY (Use totalQty) */}
+                            <td className="p-4 text-center bg-blue-50/30">
+                                <span className="font-black text-slate-900 text-lg">
+                                    {job.totalQty || job.targetQuantity || 0}
+                                </span>
+                                <span className="text-xs text-slate-400 ml-1">pcs</span>
+                            </td>
 
-                    <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                      {productName}
-                    </h3>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-slate-500">
-                    {/* FIX: Use job.totalQty for correct batch size */}
-                    <span>Target: <strong className="text-slate-700">{job.totalQty} Units</strong></span>
-                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                    <span>Client: {job.planId?.orderId?.customer || 'Multiple / Internal'}</span>
-                  </div>
-                </div>
+                            <td className="p-4 text-slate-500 font-medium">{job.planId?.clientName || "Internal"}</td>
+                            <td className="p-4 text-right">
+                                <button 
+                                    onClick={() => setSelectedJob(job)}
+                                    className="px-4 py-2 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-lg shadow-sm transition-all active:scale-95"
+                                >
+                                    Inspect
+                                </button>
+                            </td>
+                        </tr>
+                    ))
+                )}
+            </tbody>
+        </table>
+      </div>
 
-                {/* Middle: Status */}
-                <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                  </span>
-                  Ready for QC
-                </div>
-
-                {/* Right: Action */}
-                <button
-                  onClick={() => setSelectedJob(job)}
-                  className="bg-slate-900 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-slate-200 hover:shadow-blue-200 transition-all transform active:scale-95 flex items-center gap-2"
-                >
-                  <FiClipboard /> Inspect Batch
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* QC Modal Overlay */}
+      {/* Modal */}
       {selectedJob && (
-        <QCModal 
-          job={selectedJob} 
-          onClose={() => setSelectedJob(null)} 
-          onSuccess={() => {
-            setSelectedJob(null);
-            fetchJobs();
-          }} 
-        />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            
+            <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-center">
+                <div>
+                    <h2 className="text-lg font-black text-slate-900">Inspect Batch: {selectedJob.jobId}</h2>
+                    <p className="text-xs text-slate-500 font-bold mt-1">
+                        {selectedJob.productId?.name || "Unknown Product"}
+                    </p>
+                </div>
+                <button onClick={() => setSelectedJob(null)} className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors">✕</button>
+            </div>
+
+            <div className="p-6 space-y-6">
+                
+                <div className="grid grid-cols-3 gap-3">
+                    {/* 🟢 FIX 3: MODAL DISPLAY (Use totalQty) */}
+                    <div className="bg-slate-100 p-3 rounded-xl border border-slate-200 opacity-80">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+                            <FiBox /> Total Qty
+                        </label>
+                        <div className="text-xl font-black text-slate-700">
+                            {selectedJob.totalQty || selectedJob.targetQuantity || 0}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Sample Size</label>
+                        <input 
+                            type="number" 
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-xl text-slate-900 focus:border-blue-500 outline-none transition-colors"
+                            placeholder="0"
+                            value={formData.sampleSize}
+                            onChange={(e) => setFormData({...formData, sampleSize: e.target.value})}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-bold text-red-400 uppercase mb-1">Rejected</label>
+                        <input 
+                            type="number" 
+                            className="w-full p-3 bg-red-50 border border-red-100 rounded-xl font-bold text-xl text-red-600 focus:border-red-500 outline-none transition-colors"
+                            placeholder="0"
+                            value={formData.qtyRejected}
+                            onChange={(e) => setFormData({...formData, qtyRejected: e.target.value})}
+                        />
+                    </div>
+                </div>
+
+                <div className="bg-slate-50 rounded-xl p-5 border border-slate-100 grid grid-cols-2 gap-4">
+                    <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Defect Rate</p>
+                        <p className={`text-2xl font-black ${Number(stats.defectRate) > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                            {stats.defectRate}%
+                        </p>
+                    </div>
+                    <div className="text-right">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Approved Stock</p>
+                            <p className="text-2xl font-black text-slate-900">
+                            {stats.projectedPass} <span className="text-sm text-slate-400 font-medium">pcs</span>
+                            </p>
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Notes</label>
+                    <textarea 
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl font-medium text-sm outline-none focus:border-blue-500 h-20 resize-none"
+                        placeholder="Remarks..."
+                        value={formData.notes}
+                        onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                    ></textarea>
+                </div>
+
+                <button 
+                    onClick={handleSubmit}
+                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-green-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                    <FiCheckCircle /> Confirm QC
+                </button>
+
+            </div>
+          </div>
+        </div>
       )}
     </div>
-    </AuthGuard>
   );
 }

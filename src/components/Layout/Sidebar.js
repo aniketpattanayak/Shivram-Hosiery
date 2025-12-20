@@ -6,6 +6,7 @@ import {
   FiLogOut, FiChevronDown, FiChevronRight, FiShield
 } from "react-icons/fi";
 import { SYSTEM_MODULES } from "@/utils/navigationConfig";
+import api from "@/utils/api"; 
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -13,17 +14,52 @@ export default function Sidebar() {
   const [user, setUser] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
 
+  // 🟢 1. STRICT SECURITY CHECK (Forced Logout on Change)
   useEffect(() => {
-    const stored = localStorage.getItem("userInfo");
-    if (!stored) return;
-    const parsedUser = JSON.parse(stored);
-    setUser(parsedUser);
-  }, []);
+    const checkUserStatus = async () => {
+      const stored = localStorage.getItem("userInfo");
+      if (!stored) return;
 
-  // 🟢 HELPER: Check if user has access to a specific key
+      const localUser = JSON.parse(stored);
+      if (!user) setUser(localUser); // Load menu instantly
+
+      try {
+        // Fetch Fresh Data from DB
+        const { data: freshUser } = await api.get("/auth/me");
+        
+        // Compare Database vs Local Storage
+        const roleChanged = freshUser.role !== localUser.role;
+        const permsChanged = JSON.stringify(freshUser.permissions) !== JSON.stringify(localUser.permissions);
+
+        // 🚨 KILL SWITCH: If anything changed, force logout
+        if (roleChanged || permsChanged) {
+             alert("⚠️ System Notice: Your access permissions have been updated by an Admin.\n\nPlease log in again to refresh your profile.");
+             
+             // Destroy Session
+             localStorage.removeItem("userInfo");
+             localStorage.removeItem("token"); // Ensure token is cleared too
+             
+             // Force Redirect
+             router.push("/login");
+        }
+      } catch (error) {
+        // If 401 (Unauthorized), user is deleted/blocked
+        if (error.response?.status === 401) {
+            localStorage.removeItem("userInfo");
+            localStorage.removeItem("token");
+            router.push("/login");
+        }
+      }
+    };
+
+    checkUserStatus();
+  }, [pathname]); // Runs on every page navigation
+
+  // 🟢 HELPER: Check Access
   const hasAccess = (moduleKey) => {
     if (!user) return false;
     if (user.role === 'Admin') return true; 
+    
     const userPerms = Array.isArray(user.permissions) ? user.permissions : [];
     return userPerms.includes(moduleKey) || userPerms.includes('all');
   };
@@ -31,6 +67,7 @@ export default function Sidebar() {
   const handleLogout = () => {
     if (confirm("Are you sure you want to logout?")) {
       localStorage.removeItem("userInfo");
+      localStorage.removeItem("token");
       router.push("/login");
     }
   };
@@ -48,7 +85,9 @@ export default function Sidebar() {
   if (pathname === "/login" || pathname === "/register") return null;
 
   return (
-    <div className="w-64 bg-white flex flex-col h-screen border-r border-slate-200 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 print:hidden">
+    <div className="w-64 bg-white flex flex-col h-screen border-r border-slate-200 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 print:hidden fixed left-0 top-0">
+      
+      {/* Brand Header */}
       <div className="h-16 flex items-center justify-center border-b border-slate-100 bg-white">
         <h1 className="text-xl font-extrabold text-slate-800 tracking-wider">
           Shivram H<span className="text-blue-600">os</span>iery
@@ -59,21 +98,13 @@ export default function Sidebar() {
         
         {SYSTEM_MODULES.map((item, index) => {
           
-          // 🟢 1. LOGIC FOR GROUPS (e.g. Sales Hub, Manufacturing)
           if (item.groupName) {
-            
-            // Check if user has access to the Group ITSELF
-            const explicitGroupAccess = hasAccess(item.key);
-
-            // 🟢 SMART CHECK: Check if user has access to ANY child tab
-            // We derive the key from the href (e.g. '/inventory' -> 'inventory')
-            const hasChildAccess = item.items.some(sub => {
+            const childItemsWithAccess = item.items.filter(sub => {
                 const childKey = sub.key || sub.href.replace('/', '').replace('/', '_'); 
                 return hasAccess(childKey);
             });
 
-            // If user has NO access to the group AND NO access to any children, HIDE IT.
-            if (!explicitGroupAccess && !hasChildAccess) return null; 
+            if (childItemsWithAccess.length === 0) return null;
 
             const isOpen = expandedGroups[item.groupName];
             const isGroupActive = item.items.some(sub => isActive(sub.href));
@@ -95,32 +126,25 @@ export default function Sidebar() {
 
                 {isOpen && (
                   <div className="mt-1 ml-4 space-y-1 border-l-2 border-slate-100 pl-2">
-                    {item.items.map((subItem, subIndex) => {
-                      
-                      // 🟢 Filter individual sub-items
-                      const childKey = subItem.key || subItem.href.replace('/', '').replace('/', '_');
-                      if (!hasAccess(childKey) && !explicitGroupAccess) return null;
-
-                      return (
-                        <Link
-                          key={subIndex}
-                          href={subItem.href}
-                          className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200
-                            ${isActive(subItem.href) ? "bg-blue-50 text-blue-700 shadow-sm" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}
-                        >
-                           <subItem.icon className={`w-4 h-4 mr-3 transition-colors ${isActive(subItem.href) ? "text-blue-600" : "text-slate-400"}`} />
-                          {subItem.name}
-                        </Link>
-                      );
-                    })}
+                    {childItemsWithAccess.map((subItem, subIndex) => (
+                      <Link
+                        key={subIndex}
+                        href={subItem.href}
+                        className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200
+                          ${isActive(subItem.href) ? "bg-blue-50 text-blue-700 shadow-sm" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}
+                      >
+                         <subItem.icon className={`w-4 h-4 mr-3 transition-colors ${isActive(subItem.href) ? "text-blue-600" : "text-slate-400"}`} />
+                        {subItem.name}
+                      </Link>
+                    ))}
                   </div>
                 )}
               </div>
             );
           }
 
-          // 🟢 2. LOGIC FOR STANDALONE ITEMS (e.g. Dashboard)
-          if (!hasAccess(item.key)) return null; 
+          const itemKey = item.key || item.href.replace('/', '').replace('/', '_');
+          if (!hasAccess(itemKey)) return null; 
 
           return (
             <Link
@@ -135,7 +159,6 @@ export default function Sidebar() {
           );
         })}
 
-        {/* ADMIN SETTINGS */}
         {user?.role === "Admin" && (
             <Link
             href="/settings"
@@ -147,7 +170,8 @@ export default function Sidebar() {
           </Link>
         )}
       </nav>
-      {/* Footer User Info ... */}
+
+      {/* Footer User Info */}
       <div className="p-4 border-t border-slate-100 bg-slate-50/50">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-md shadow-blue-200">

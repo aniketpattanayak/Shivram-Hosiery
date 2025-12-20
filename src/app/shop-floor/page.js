@@ -3,505 +3,270 @@ import { useState, useEffect } from "react";
 import api from "@/utils/api";
 import AuthGuard from '@/components/AuthGuard';
 import {
-  FiBox,
-  FiScissors,
-  FiLayers,
-  FiCheckCircle,
-  FiArrowRight,
-  FiX,
-  FiClock,
-  FiMapPin,
-  FiActivity,
-  FiUser,
-  FiPackage,
-  FiShoppingCart,
+  FiBox, FiScissors, FiLayers, FiPackage, FiCheckCircle, 
+  FiArrowRight, FiClock, FiSearch, FiFilter, FiX, FiActivity, FiMapPin, FiAlertTriangle, FiUser
 } from "react-icons/fi";
+
+const WORKFLOW_STEPS = [
+    { id: "Material_Pending", label: "Material", icon: FiBox, color: "blue", routeKey: "cutting" },
+    { id: "Cutting_Started", label: "Cutting", icon: FiScissors, color: "amber", routeKey: "cutting" },
+    { id: "Sewing_Started", label: "Stitching", icon: FiLayers, color: "indigo", routeKey: "stitching" },
+    { id: "Packaging_Started", label: "Packing", icon: FiPackage, color: "purple", routeKey: "packaging" },
+    { id: "QC_Pending", label: "QC Check", icon: FiCheckCircle, color: "emerald", routeKey: null },
+];
 
 export default function ShopFloorPage() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Modal & Feedback State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStage, setFilterStage] = useState("ALL");
   const [pickingFeedback, setPickingFeedback] = useState({});
   const [selectedJob, setSelectedJob] = useState(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Custom Confirmation Popup State
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null
+  });
+
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     try {
       const res = await api.get("/shopfloor");
       setJobs(res.data);
       setLoading(false);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   // --- ACTIONS ---
-  const issueMaterial = async (jobId) => {
+  const triggerIssueMaterial = (jobId) => {
     const job = jobs.find((j) => j.jobId === jobId);
-
-    const cuttingStrategy = job.routing?.cutting;
-    const isJobWork = cuttingStrategy?.type === "Job Work";
-    const vendorName = cuttingStrategy?.vendorName || "Unknown Vendor";
-
-    let confirmMsg = "Confirm Issue Material for Internal Cutting?";
-    if (isJobWork) {
-      confirmMsg = `⚠️ ALERT: This is a JOB WORK Order.\n\nIssue Material to Vendor: "${vendorName}"?\n\n(This will generate a Job Work Challan)`;
-    }
-
-    if (!confirm(confirmMsg)) return;
-
-    try {
-      const res = await api.post("/shopfloor/issue", { jobId });
-      if (res.data.pickingList) {
-        setPickingFeedback((prev) => ({
-          ...prev,
-          [jobId]: res.data.pickingList,
-        }));
-      }
-      fetchData();
-    } catch (error) {
-      alert("Error: " + (error.response?.data?.msg || error.message));
-    }
-  };
-
-  const receiveCutting = async (jobId) => {
-    try {
-      await api.post("/shopfloor/receive", {
-        jobId,
-        nextStage: "Sewing_Started",
-      });
-      fetchData();
-    } catch (error) {
-      alert("Error receiving");
-    }
-  };
-
-  const receiveSewing = async (jobId) => {
-    try {
-      await api.post("/shopfloor/receive", {
-        jobId,
-        nextStage: "Packaging_Started",
-      });
-      fetchData();
-    } catch (error) {
-      alert("Error receiving");
-    }
-  };
-
-  const receivePackaging = async (jobId) => {
-    try {
-      await api.post("/shopfloor/receive", { jobId, nextStage: "QC_Pending" });
-      fetchData();
-    } catch (error) {
-      alert("Error receiving");
-    }
-  };
-
-  const dismissFeedback = (jobId) => {
-    setPickingFeedback((prev) => {
-      const newState = { ...prev };
-      delete newState[jobId];
-      return newState;
+    const route = job.routing?.cutting;
+    const isJobWork = route?.type === "Job Work";
+    
+    setConfirmDialog({
+        isOpen: true,
+        title: "Issue Material",
+        message: isJobWork 
+            ? `Issue fabric to Vendor: "${route.vendorName}" for Job Work?` 
+            : "Issue fabric for In-House cutting?",
+        onConfirm: async () => {
+            try {
+                const res = await api.post("/shopfloor/issue", { jobId });
+                if (res.data.pickingList) setPickingFeedback(prev => ({ ...prev, [jobId]: res.data.pickingList }));
+                fetchData();
+            } catch (e) { alert("Error: " + e.message); }
+            setConfirmDialog({ isOpen: false });
+        }
     });
   };
 
-  // --- KANBAN COLUMNS ---
-  const stages = [
-    {
-      id: "Material_Pending",
-      title: "🔴 Material Pending",
-      icon: FiBox,
-      action: issueMaterial,
-      btnText: "Issue Fabric",
-    },
-    {
-      id: "Cutting_Started",
-      title: "✂️ Cutting",
-      icon: FiScissors,
-      action: receiveCutting,
-      btnText: "Cutting Done",
-    },
-    {
-      id: "Sewing_Started",
-      title: "🧵 Stitching",
-      icon: FiLayers,
-      action: receiveSewing,
-      btnText: "Stitching Done",
-    },
-    {
-      id: "Packaging_Started",
-      title: "📦 Packaging",
-      icon: FiPackage,
-      action: receivePackaging,
-      btnText: "Packing Done",
-    },
-    {
-      id: "QC_Pending",
-      title: "🔍 Ready for QC",
-      icon: FiCheckCircle,
-      action: null,
-      btnText: "Go to QC Module",
-    },
-    {
-      id: "Procurement_Pending",
-      title: "🛒 Procurement (Full Buy)",
-      icon: FiShoppingCart,
-      action: null,
-      btnText: "View PO",
-    },
-  ];
+  const triggerAdvanceStage = (jobId, nextStage, label) => {
+      setConfirmDialog({
+          isOpen: true,
+          title: `Complete ${label}`,
+          message: `Confirm that ${label} is finished. Move Job ${jobId} to the next stage?`,
+          onConfirm: async () => {
+              try {
+                await api.post("/shopfloor/receive", { jobId, nextStage });
+                fetchData();
+              } catch (e) { alert("Error updating stage"); }
+              setConfirmDialog({ isOpen: false });
+          }
+      });
+  };
+
+  // --- LOGIC HELPERS ---
+  const getStepStatus = (currentStepId, stepId) => {
+    const currentIndex = WORKFLOW_STEPS.findIndex(s => s.id === currentStepId);
+    const stepIndex = WORKFLOW_STEPS.findIndex(s => s.id === stepId);
+    if (stepIndex < currentIndex) return 'completed';
+    if (stepIndex === currentIndex) return 'active';
+    return 'pending';
+  };
+
+  const getActionConfig = (currentStep, jobId) => {
+      switch(currentStep) {
+          case 'Material_Pending': return { text: "Issue Fabric", action: () => triggerIssueMaterial(jobId), color: "bg-slate-900" };
+          case 'Cutting_Started': return { text: "Cutting Done", action: () => triggerAdvanceStage(jobId, 'Sewing_Started', 'Cutting'), color: "bg-amber-600" };
+          case 'Sewing_Started': return { text: "Stitching Done", action: () => triggerAdvanceStage(jobId, 'Packaging_Started', 'Stitching'), color: "bg-blue-600" };
+          case 'Packaging_Started': return { text: "Packing Done", action: () => triggerAdvanceStage(jobId, 'QC_Pending', 'Packing'), color: "bg-purple-600" };
+          default: return null;
+      }
+  };
+
+  const filteredJobs = jobs.filter(job => {
+      if (job.type === "Full-Buy") return false; 
+      const matchesSearch = job.jobId.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStage = filterStage === "ALL" || job.currentStep === filterStage;
+      return matchesSearch && matchesStage;
+  });
 
   return (
     <AuthGuard requiredPermission="shop-floor">
-    <div className="space-y-6 animate-in fade-in">
-      <div className="border-b border-slate-200 pb-6 flex justify-between items-end">
+    <div className="p-6 max-w-[1600px] mx-auto min-h-screen bg-white">
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900">
-            Shop Floor Execution
-          </h1>
-          <p className="text-slate-500 mt-2">
-            Manage Job Cards, Issue Materials, and Track Production Stages.
-          </p>
+          <h1 className="text-2xl font-black text-slate-900">Shop Floor Sheet</h1>
+          <p className="text-slate-500 text-sm">Full production data and real-time tracking.</p>
+        </div>
+        <div className="relative">
+            <FiSearch className="absolute left-3 top-3 text-slate-400" />
+            <input 
+                type="text" placeholder="Search Job ID..." 
+                className="pl-10 pr-4 py-2 bg-slate-50 border rounded-xl text-sm font-bold outline-none w-64"
+                value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+            />
         </div>
       </div>
 
-      <div className="flex gap-6 overflow-x-auto pb-8 min-h-[600px]">
-        {stages.map((stage) => (
-          <div
-            key={stage.id}
-            className="min-w-[340px] bg-slate-100 rounded-2xl p-4 flex flex-col"
-          >
-            <div className="flex items-center gap-2 mb-4 text-slate-700 font-bold px-2 uppercase tracking-wide text-xs">
-              <stage.icon size={16} /> {stage.title}
-            </div>
-
-            <div className="space-y-3 flex-1">
-              {jobs
-                .filter((j) => j.currentStep === stage.id)
-                .map((job) => {
-                  const feedback = pickingFeedback[job.jobId];
-                  const isFullBuy = job.type === "Full-Buy";
-
-                  // 🟢 LOGIC: Calculate "Current" and "Next" Locations based on Routing
-                  let currentLocation = "Store";
-                  let targetLocation = "";
-                  let isJobWorkStep = false; // Controls Badge Color
-
-                  // 1. MATERIAL PENDING
-                  if (job.currentStep === "Material_Pending") {
-                    const route = job.routing?.cutting;
-                    isJobWorkStep = route?.type === "Job Work";
-                    targetLocation = isJobWorkStep
-                      ? `Job Work: ${route.vendorName} (Cutting)`
-                      : "In-House Cutting";
-                  }
-
-                  // 2. CUTTING (Active)
-                  else if (job.currentStep === "Cutting_Started") {
-                    const currentRoute = job.routing?.cutting;
-                    isJobWorkStep = currentRoute?.type === "Job Work";
-                    currentLocation = isJobWorkStep
-                      ? `Job Work: ${currentRoute.vendorName}`
-                      : "In-House Cutting";
-
-                    const nextRoute = job.routing?.stitching;
-                    const nextJw = nextRoute?.type === "Job Work";
-                    targetLocation = nextJw
-                      ? `Next: ${nextRoute.vendorName} (Stitching)`
-                      : "Next: In-House Stitching";
-                  }
-
-                  // 3. STITCHING (Active)
-                  else if (job.currentStep === "Sewing_Started") {
-                    const currentRoute = job.routing?.stitching;
-                    isJobWorkStep = currentRoute?.type === "Job Work";
-                    currentLocation = isJobWorkStep
-                      ? `Job Work: ${currentRoute.vendorName}`
-                      : "In-House Stitching";
-
-                    const nextRoute = job.routing?.packing;
-                    const nextJw = nextRoute?.type === "Job Work";
-                    targetLocation = nextJw
-                      ? `Next: ${nextRoute.vendorName} (Packing)`
-                      : "Next: In-House Packing";
-                  }
-
-                  // 4. PACKAGING (Active)
-                  else if (job.currentStep === "Packaging_Started") {
-                    const currentRoute = job.routing?.packing;
-                    isJobWorkStep = currentRoute?.type === "Job Work";
-                    currentLocation = isJobWorkStep
-                      ? `Job Work: ${currentRoute.vendorName}`
-                      : "In-House Packing";
-
-                    targetLocation = "Next: QC Check";
-                  }
-
-                  const isBatch =
-                    job.isBatch ||
-                    (job.batchPlans && job.batchPlans.length > 0);
-
-                  return (
-                    <div
-                      key={job._id}
-                      className={`p-5 rounded-xl shadow-sm border hover:shadow-md transition-all relative group bg-white ${
-                        isFullBuy
-                          ? "border-purple-200 bg-purple-50/30"
-                          : "border-slate-200"
-                      }`}
-                    >
-                      {/* Header */}
-                      <div className="flex justify-between items-center mb-3">
-                        <span
-                          className={`text-[10px] font-black px-2 py-1 rounded ${
-                            isFullBuy
-                              ? "bg-purple-100 text-purple-700"
-                              : "bg-blue-50 text-blue-600"
-                          }`}
-                        >
-                          {job.jobId}
-                        </span>
-                        <button
-                          onClick={() => setSelectedJob(job)}
-                          className="text-[10px] font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1 transition-colors"
-                        >
-                          <FiClock /> History
-                        </button>
-                      </div>
-
-                      <h4 className="font-bold text-slate-800 text-sm mb-1">
-                        {job.productId?.name || "Unknown Item"}
-                      </h4>
-                      <div className="text-xs text-slate-500 font-medium mb-4">
-                        Qty:{" "}
-                        <span className="text-slate-900 font-bold">
-                          {job.totalQty}
-                        </span>{" "}
-                        units
-                      </div>
-
-                      {/* 🟢 LOCATION BADGES (The "Old Card" Design) */}
-                      {!isFullBuy && (
-                        <div className="bg-slate-50 rounded-lg p-3 mb-4 space-y-2 border border-slate-100">
-                          <div className="flex items-start gap-2">
-                            <FiMapPin
-                              className="text-slate-400 mt-0.5"
-                              size={12}
-                            />
-                            <div>
-                              <p className="text-[10px] text-slate-400 uppercase font-bold">
-                                Current Location
-                              </p>
-                              <p
-                                className={`text-xs font-bold ${
-                                  isJobWorkStep
-                                    ? "text-amber-600"
-                                    : "text-slate-700"
-                                }`}
-                              >
-                                {currentLocation}
-                              </p>
-                            </div>
-                          </div>
-                          {targetLocation && (
-                            <div className="flex items-start gap-2 pt-2 border-t border-slate-200">
-                              <FiArrowRight
-                                className="text-slate-400 mt-0.5"
-                                size={12}
-                              />
-                              <div>
-                                <p className="text-[10px] text-slate-400 uppercase font-bold">
-                                  Target / Next
-                                </p>
-                                <p className="text-xs font-bold text-slate-600">
-                                  {targetLocation}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* 🟢 FULL BUY STATUS (If applicable) */}
-                      {isFullBuy && (
-                        <div className="bg-white rounded-lg p-3 mb-4 border border-purple-100 space-y-2 shadow-sm">
-                          <div className="flex justify-between items-center text-[10px]">
-                            <span className="text-purple-800 font-bold flex items-center gap-1">
-                              <FiShoppingCart /> PO Status
-                            </span>
-                            <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded border border-purple-200 text-[9px] font-bold">
-                              Pending
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center text-[10px]">
-                            <span className="text-slate-400 font-medium">
-                              Received Qty
-                            </span>
-                            <span className="font-mono font-bold text-slate-800">
-                              0 / {job.totalQty}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {isBatch && (
-                        <div className="absolute top-14 right-5">
-                          <span className="bg-purple-100 text-purple-700 text-[9px] font-bold px-1.5 py-0.5 rounded border border-purple-200">
-                            BATCH ({job.batchPlans?.length || 0})
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Feedback (Picking List) */}
-                      {feedback && (
-                        <div className="mb-4 bg-emerald-50 border border-emerald-100 rounded-lg p-3 relative animate-in zoom-in-95 duration-200">
-                          <button
-                            onClick={() => dismissFeedback(job.jobId)}
-                            className="absolute top-1 right-1 text-emerald-400 hover:text-emerald-700"
-                          >
-                            <FiX size={14} />
-                          </button>
-                          <p className="text-[10px] font-bold uppercase text-emerald-600 mb-2">
-                            ✅ Material Issued:
-                          </p>
-                          <ul className="space-y-2">
-                            {feedback.map((item, idx) => (
-                              <li
-                                key={idx}
-                                className="text-[10px] text-slate-700 flex justify-between items-start border-b border-emerald-100 last:border-0 pb-1 last:pb-0"
-                              >
-                                <span className="font-medium">
-                                  {item.material}:
-                                </span>
-                                <div className="text-right">
-                                  <span className="font-mono font-bold block text-slate-900">
-                                    {item.qty} from {item.lotNumber}
-                                  </span>
-                                  {item.vendorName && (
-                                    <span className="text-[9px] text-slate-500 block uppercase tracking-wide">
-                                      (Supp: {item.vendorName})
-                                    </span>
-                                  )}
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Action Buttons */}
-                      {stage.action && !isFullBuy ? (
-                        <button
-                          onClick={() => stage.action(job.jobId)}
-                          className="w-full py-2.5 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-black transition-colors flex justify-center items-center gap-2 shadow-sm"
-                        >
-                          {stage.btnText} <FiArrowRight />
-                        </button>
-                      ) : (
-                        <div
-                          className={`text-center text-xs font-bold py-2.5 rounded-lg border ${
-                            isFullBuy
-                              ? "bg-purple-100 text-purple-600 border-purple-200"
-                              : "text-emerald-600 bg-emerald-50 border-emerald-100"
-                          }`}
-                        >
-                          {isFullBuy
-                            ? "View Purchase Order"
-                            : "Waiting for Next Step"}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              {jobs.filter((j) => j.currentStep === stage.id).length === 0 && (
-                <div className="text-center py-12 text-slate-300 text-xs font-bold italic opacity-50">
-                  Empty Station
+      {/* Visual Filter Cards */}
+      <div className="flex gap-3 overflow-x-auto pb-6 scrollbar-hide">
+        <button onClick={() => setFilterStage("ALL")} className={`flex-shrink-0 px-5 py-3 rounded-2xl border-2 transition-all flex items-center gap-3 ${filterStage === 'ALL' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300'}`}>
+            <span className="font-black text-lg">{jobs.filter(j => j.type !== "Full-Buy").length}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest">All Active</span>
+        </button>
+        {WORKFLOW_STEPS.map((step) => (
+            <button key={step.id} onClick={() => setFilterStage(step.id)} className={`flex-shrink-0 px-5 py-3 rounded-2xl border-2 transition-all flex items-center gap-3 ${filterStage === step.id ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}>
+                <step.icon size={16} />
+                <div className="text-left">
+                    <div className="font-black text-sm leading-none">{jobs.filter(j => j.currentStep === step.id).length}</div>
+                    <div className="text-[9px] font-bold uppercase mt-1">{step.label}</div>
                 </div>
-              )}
-            </div>
-          </div>
+            </button>
         ))}
       </div>
 
-      {/* 🟢 HISTORY MODAL (Removed Bottom Close Button) */}
-      {selectedJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <div>
-                <h3 className="font-bold text-lg text-slate-800">
-                  Job Card History
-                </h3>
-                <p className="text-xs text-slate-500 font-mono">
-                  {selectedJob.jobId}
-                </p>
-              </div>
-              {/* Header Close Button (Kept as requested) */}
-              <button
-                onClick={() => setSelectedJob(null)}
-                className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors text-slate-600"
-              >
-                <FiX size={20} />
-              </button>
-            </div>
+      {/* Main Detailed Sheet Table */}
+      <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm overflow-x-auto">
+        <table className="w-full text-left text-sm min-w-[1000px]">
+            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] border-b border-slate-200">
+                <tr>
+                    <th className="p-4 w-56">Job & Product Info</th>
+                    <th className="p-4 text-center">Process Pipeline</th> 
+                    <th className="p-4">Location / Vendor</th>
+                    <th className="p-4 text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+                {filteredJobs.map((job) => {
+                    const action = getActionConfig(job.currentStep, job.jobId);
+                    const feedback = pickingFeedback[job.jobId];
 
-            <div className="p-6 overflow-y-auto space-y-6 flex-grow">
-              {selectedJob.timeline && selectedJob.timeline.length > 0 ? (
-                selectedJob.timeline.map((log, i) => (
-                  <div key={i} className="flex gap-4 relative">
-                    {i !== selectedJob.timeline.length - 1 && (
-                      <div className="absolute left-[19px] top-8 bottom-[-24px] w-0.5 bg-slate-200"></div>
-                    )}
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-4 border-white shadow-sm z-10 
-                                    ${
-                                      log.stage?.includes("Material")
-                                        ? "bg-blue-100 text-blue-600"
-                                        : log.stage?.includes("Cutting")
-                                        ? "bg-amber-100 text-amber-600"
-                                        : "bg-emerald-100 text-emerald-600"
-                                    }`}
-                    >
-                      <FiActivity size={16} />
-                    </div>
-                    <div className="flex-grow">
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">
-                        {new Date(log.timestamp).toLocaleString()}
-                      </p>
-                      <h4 className="font-bold text-slate-800 text-sm">
-                        {log.action || log.stage}
-                      </h4>
-                      <div className="mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs text-slate-600">
-                        <p>
-                          <strong className="text-slate-800">
-                            Assigned To:
-                          </strong>{" "}
-                          {log.vendorName || "In-House"}
-                        </p>
-                        {/* Shows the detailed history text from Backend */}
-                        {log.details && (
-                          <p className="mt-1 border-t border-slate-200 pt-1 whitespace-pre-line">
-                            {log.details}
-                          </p>
-                        )}
-                        {log.performedBy && (
-                          <p className="mt-1 text-slate-400 flex items-center gap-1">
-                            <FiUser size={10} /> {log.performedBy}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                    // Determine current vendor/location based on active step
+                    let currentLocation = "Store";
+                    let isJobWork = false;
+                    const stepObj = WORKFLOW_STEPS.find(s => s.id === job.currentStep);
+                    const route = stepObj?.routeKey ? job.routing?.[stepObj.routeKey] : null;
+                    
+                    if(route) {
+                        isJobWork = route.type === "Job Work";
+                        currentLocation = isJobWork ? `Vendor: ${route.vendorName}` : "In-House";
+                    }
+
+                    return (
+                        <tr key={job._id} className="hover:bg-slate-50/50 transition-colors">
+                            {/* 1. Job Info with SKU and Client */}
+                            <td className="p-4 align-top">
+                                <span className="font-mono text-blue-600 font-bold text-[10px] bg-blue-50 px-2 py-0.5 rounded">{job.jobId}</span>
+                                <div className="font-bold text-slate-800 text-sm mt-1">{job.productId?.name}</div>
+                                <div className="text-[10px] text-slate-400 font-mono mt-0.5">{job.productId?.sku || "NO-SKU"}</div>
+                                <div className="text-[10px] text-slate-500 font-bold mt-2 uppercase">Qty: {job.totalQty} | <span className="text-slate-400 font-medium">Client: {job.planId?.clientName || "Internal"}</span></div>
+                                <button onClick={() => setSelectedJob(job)} className="text-[10px] text-blue-500 font-bold flex items-center gap-1 mt-3 hover:underline tracking-tight"><FiClock/> VIEW HISTORY LOG</button>
+                            </td>
+
+                            {/* 2. Visual Pipeline with Timestamps */}
+                            <td className="p-4 align-middle">
+                                <div className="flex items-center justify-center w-full max-w-lg mx-auto relative px-4">
+                                    <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 -z-10"></div>
+                                    {WORKFLOW_STEPS.map((step) => {
+                                        const status = getStepStatus(job.currentStep, step.id);
+                                        const timeLog = job.timeline?.find(t => t.stage === step.id);
+                                        return (
+                                            <div key={step.id} className="flex-1 flex flex-col items-center">
+                                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] transition-all
+                                                    ${status === 'completed' ? 'bg-emerald-500 text-white' : status === 'active' ? 'bg-blue-600 text-white shadow-lg scale-110' : 'bg-white border border-slate-200 text-slate-200'}`}>
+                                                    <step.icon size={12} />
+                                                </div>
+                                                <span className={`text-[8px] mt-1 font-bold uppercase ${status === 'active' ? 'text-blue-600' : 'text-slate-300'}`}>{step.label}</span>
+                                                {timeLog && <span className="text-[7px] text-slate-400 mt-1 font-mono">{new Date(timeLog.timestamp).toLocaleDateString([], {day:'2-digit', month:'2-digit'})}</span>}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </td>
+
+                            {/* 3. Real Location Info */}
+                            <td className="p-4 align-top">
+                                <div className={`flex items-start gap-2 text-xs font-bold ${isJobWork ? "text-amber-600" : "text-slate-600"}`}>
+                                    <FiMapPin className="mt-0.5" />
+                                    <div>
+                                        <span>{currentLocation}</span>
+                                        {isJobWork && <div className="text-[9px] bg-amber-50 px-1 py-0.5 rounded mt-1 border border-amber-100 uppercase tracking-tighter">Job Work Active</div>}
+                                    </div>
+                                </div>
+                            </td>
+
+                            {/* 4. Action Buttons */}
+                            <td className="p-4 text-right align-middle">
+                                {action ? (
+                                    <button onClick={action.action} className={`px-4 py-2 text-white text-[11px] font-black rounded-lg shadow-sm active:scale-95 transition-all ${action.color}`}>
+                                        {action.text} <FiArrowRight className="inline ml-1"/>
+                                    </button>
+                                ) : <span className="text-xs italic text-slate-300">In Process</span>}
+
+                                {feedback && (
+                                    <div className="mt-2 text-[9px] text-emerald-600 font-bold bg-emerald-50 p-2 rounded border border-emerald-100">
+                                        Issued: {feedback.length} Fabrics
+                                    </div>
+                                )}
+                            </td>
+                        </tr>
+                    );
+                })}
+            </tbody>
+        </table>
+      </div>
+
+      {/* CUSTOM CONFIRMATION POPUP */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden p-8 text-center animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4"><FiAlertTriangle size={32} /></div>
+            <h3 className="text-xl font-black text-slate-900 mb-2">{confirmDialog.title}</h3>
+            <p className="text-sm text-slate-500 font-medium mb-8">{confirmDialog.message}</p>
+            <div className="flex gap-3">
+                <button onClick={() => setConfirmDialog({...confirmDialog, isOpen: false})} className="flex-1 py-3 bg-slate-50 text-slate-600 font-bold rounded-xl">Cancel</button>
+                <button onClick={confirmDialog.onConfirm} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">Yes, Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* HISTORY LOG MODAL */}
+      {selectedJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-slate-800 tracking-tight">Production Log: {selectedJob.jobId}</h3>
+              <button onClick={() => setSelectedJob(null)} className="p-2 hover:bg-slate-200 rounded-full"><FiX/></button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-4">
+              {selectedJob.timeline?.map((log, i) => (
+                <div key={i} className="flex gap-4 border-l-2 border-blue-100 pl-4 py-2">
+                  <div className="flex-1">
+                    <p className="text-[10px] text-slate-400 font-bold">{new Date(log.timestamp).toLocaleString()}</p>
+                    <p className="text-sm font-bold text-slate-800">{log.action || log.stage}</p>
+                    <p className="text-xs text-slate-500 mt-1 bg-slate-50 p-3 rounded-lg border border-slate-100 whitespace-pre-line">{log.details}</p>
+                    {log.performedBy && <p className="text-[10px] text-slate-400 mt-2 flex items-center gap-1"><FiUser size={10}/> Done by: {log.performedBy}</p>}
                   </div>
-                ))
-              ) : (
-                <div className="text-center text-slate-400 py-8">
-                  No history recorded yet.
                 </div>
-              )}
+              ))}
             </div>
           </div>
         </div>

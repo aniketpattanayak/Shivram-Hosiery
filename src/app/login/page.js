@@ -1,9 +1,9 @@
 'use client';
 import { useState } from 'react';
-import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { FiLock, FiMail, FiArrowRight } from 'react-icons/fi';
 import api from '@/utils/api';
+import { SYSTEM_MODULES } from "@/utils/navigationConfig"; // 🟢 IMPORT ADDED
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,13 +19,67 @@ export default function LoginPage() {
     try {
       const res = await api.post('/auth/login', formData);
       
-      // Save User Data to Browser Storage
-      localStorage.setItem('userInfo', JSON.stringify(res.data));
+      // 1. Validate Response
+      if (!res.data || !res.data.token || !res.data.user) {
+          throw new Error("Invalid server response");
+      }
+
+      // 2. Save User Data
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('userInfo', JSON.stringify(res.data.user));
       
-      // Redirect to Dashboard
-      window.location.href = '/';
+      // 3. 🟢 SMART REDIRECT LOGIC STARTS HERE
+      const user = res.data.user;
+      const userPerms = Array.isArray(user.permissions) ? user.permissions : [];
+      const isAdmin = user.role === 'Admin';
+      
+      // Helper to check access
+      const hasAccess = (key) => isAdmin || userPerms.includes('all') || userPerms.includes(key);
+
+      // A. Check Dashboard First (Default)
+      if (hasAccess('dashboard')) {
+          router.push('/dashboard');
+          return;
+      }
+
+      // B. If no dashboard, find the first allowed link
+      let firstAllowedRoute = null;
+
+      if (SYSTEM_MODULES && Array.isArray(SYSTEM_MODULES)) {
+          for (const module of SYSTEM_MODULES) {
+              // Case 1: Group (e.g. Sales Hub)
+              if (module.groupName && Array.isArray(module.items)) {
+                  for (const item of module.items) {
+                      const key = item.key || (item.href ? item.href.replace('/', '').replace('/', '_') : "");
+                      if (key && hasAccess(key)) {
+                          firstAllowedRoute = item.href;
+                          break;
+                      }
+                  }
+              } 
+              // Case 2: Direct Link (e.g. Analytics)
+              else if (module.href) {
+                  const key = module.key || module.href.replace('/', '').replace('/', '_');
+                  if (hasAccess(key)) {
+                      firstAllowedRoute = module.href;
+                      break;
+                  }
+              }
+              if (firstAllowedRoute) break; // Stop loop once found
+          }
+      }
+
+      // C. Redirect
+      if (firstAllowedRoute) {
+          router.push(firstAllowedRoute);
+      } else {
+          // Fallback if they have NO permissions at all
+          router.push('/dashboard'); 
+      }
+
     } catch (err) {
-      setError(err.response?.data?.msg || 'Login failed');
+      console.error(err);
+      setError(err.response?.data?.msg || err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
