@@ -15,7 +15,7 @@ import {
 // 🟢 1. INTERNAL COMPONENT: Contains all the Logic & Search Params
 function NewQuoteContent() {
   const router = useRouter();
-  const searchParams = useSearchParams(); // 🟢 Safe to use here now
+  const searchParams = useSearchParams(); 
   const preSelectedClientId = searchParams.get("clientId");
 
   const [loading, setLoading] = useState(false);
@@ -42,7 +42,7 @@ function NewQuoteContent() {
         description: "",
         qty: 1,
         rate: 0,
-        gstPercent: 18,
+        gstPercent: 0, // 🟢 Set to 0 to disable tax
       },
     ],
     terms: {
@@ -156,7 +156,7 @@ function NewQuoteContent() {
           description: "",
           qty: 1,
           rate: 0,
-          gstPercent: 18,
+          gstPercent: 0, // 🟢 Set to 0
         },
       ],
     }));
@@ -168,17 +168,18 @@ function NewQuoteContent() {
     setFormData({ ...formData, items: newItems });
   };
 
+  // 🟢 UPDATED TOTALS: Removed Tax Logic
   const totals = useMemo(() => {
     let subTotal = 0;
-    let taxAmount = 0;
+    let taxAmount = 0; // Always 0 now
 
     formData.items.forEach((item) => {
       const lineTotal = Number(item.qty) * Number(item.rate);
       subTotal += lineTotal;
-      taxAmount += lineTotal * (Number(item.gstPercent) / 100);
+      // Tax calculation removed
     });
 
-    return { subTotal, taxAmount, grandTotal: subTotal + taxAmount };
+    return { subTotal, taxAmount, grandTotal: subTotal };
   }, [formData.items]);
 
   const handleSubmit = async (e) => {
@@ -443,16 +444,12 @@ function NewQuoteContent() {
             ))}
           </div>
 
-          {/* Grand Totals */}
+          {/* Grand Totals (UPDATED: NO GST) */}
           <div className="mt-6 flex justify-end">
             <div className="w-64 space-y-2 border-t border-slate-200 pt-4">
               <div className="flex justify-between text-sm text-slate-500">
                 <span>Subtotal</span>
                 <span>₹{totals.subTotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm text-slate-500">
-                <span>GST (18%)</span>
-                <span>₹{totals.taxAmount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-xl font-black text-slate-900 pt-2 border-t border-slate-100">
                 <span>Total</span>

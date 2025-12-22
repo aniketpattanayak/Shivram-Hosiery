@@ -144,10 +144,11 @@ export default function NewOrderPage() {
 
   useEffect(() => { fetchInitData(); }, []);
 
+  // 🟢 UPDATED FINANCIALS: REMOVED GST
   const financials = useMemo(() => {
     const subTotal = formData.items.reduce((acc, item) => acc + ((item.qtyOrdered || 0) * (item.unitPrice || 0)), 0);
-    const taxAmount = subTotal * 0.18; 
-    const grandTotal = subTotal + taxAmount;
+    const taxAmount = 0; // No GST
+    const grandTotal = subTotal; // Total is just subtotal
     return { subTotal, taxAmount, grandTotal };
   }, [formData.items]);
 
@@ -334,11 +335,11 @@ export default function NewOrderPage() {
             </div>
         </div>
 
-        {/* Financials */}
+        {/* Financials (UPDATED: NO GST ROW) */}
         <div className="flex justify-end">
             <div className="w-full md:w-80 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                 <div className="flex justify-between text-sm font-medium text-slate-500"><span>Subtotal</span><span>₹{financials.subTotal.toLocaleString()}</span></div>
-                <div className="flex justify-between text-sm font-medium text-slate-500"><span>GST (18%)</span><span>₹{financials.taxAmount.toLocaleString()}</span></div>
+                {/* GST Row Removed */}
                 <div className="border-t border-slate-200 pt-3 flex justify-between items-center"><span className="font-bold text-slate-800">Grand Total</span><span className="text-2xl font-black text-slate-900">₹{financials.grandTotal.toLocaleString()}</span></div>
             </div>
         </div>

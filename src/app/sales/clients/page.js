@@ -160,7 +160,7 @@ export default function ClientsPage() {
         </div>
         {view === "list" && (
           <button onClick={() => setView("add")} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-lg shadow-blue-200">
-            <FiPlus /> Add Customer
+            <FiPlus /> Add Leads
           </button>
         )}
       </div>

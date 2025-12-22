@@ -120,17 +120,14 @@ export default function ViewQuotePage() {
           </tbody>
         </table>
 
-        {/* Totals */}
+        {/* Totals (UPDATED: NO GST) */}
         <div className="flex justify-end mb-12">
           <div className="w-64 space-y-2">
             <div className="flex justify-between text-sm text-slate-500">
               <span>Subtotal</span>
               <span>₹{quote.subTotal.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-sm text-slate-500">
-              <span>GST (18%)</span>
-              <span>₹{quote.taxAmount.toLocaleString()}</span>
-            </div>
+            {/* GST Removed */}
             <div className="flex justify-between text-xl font-black text-slate-900 pt-4 border-t-2 border-slate-900 mt-2">
               <span>Total</span>
               <span>₹{quote.grandTotal.toLocaleString()}</span>
