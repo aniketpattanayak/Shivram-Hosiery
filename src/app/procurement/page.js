@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "@/utils/api";
 import AuthGuard from "@/components/AuthGuard";
 import {
@@ -12,7 +12,9 @@ import {
   FiAlertCircle,
   FiArrowDown,
   FiTag,
-  FiBox
+  FiBox,
+  FiActivity,
+  FiRefreshCw
 } from "react-icons/fi";
 
 export default function ProcurementPage() {
@@ -62,39 +64,61 @@ export default function ProcurementPage() {
     }
   };
 
-  // 🟢 HELPER: Find Vendor Name using ID
-  const getVendorNameForCard = (req) => {
-      // 1. If no vendor assigned
-      if (!req.vendorId) return "Not Assigned";
+  // 🟢 1. LOGIC: IDENTIFY CRITICAL STOCK
+  const criticalMaterials = useMemo(() => {
+    return materials.filter(m => {
+        const current = m.stock?.current || 0;
+        const safety = m.safetyStock || 0; // Ensure your Material model has this, otherwise defaults 0
+        // Show if Safety Stock is set AND Current is less than or equal to Safety
+        return safety > 0 && current <= safety;
+    });
+  }, [materials]);
 
-      // 2. If backend populated it (sent full object)
-      if (typeof req.vendorId === 'object' && req.vendorId.name) return req.vendorId.name;
+  // 🟢 2. ACTION: PRE-FILL FORM FOR RESTOCKING
+  const handleRestock = (material) => {
+      setActiveTab("RM");
       
-      // 3. If backend sent ID String (Search in our list)
+      const current = material.stock?.current || 0;
+      const safety = material.safetyStock || 0;
+      const deficit = Math.max(0, safety - current);
+      // If deficit is 0 (exact match), suggest buying at least some buffer, e.g. 10% or 10 units
+      const suggestedQty = deficit === 0 ? 10 : deficit; 
+
+      setFormData({
+          vendor: "", // User must select vendor, or we could find last supplier
+          itemId: material._id,
+          itemType: "Raw Material",
+          qty: suggestedQty,
+          unitPrice: "" // Rate varies
+      });
+      
+      // Scroll to form
+      window.scrollTo({ top: 300, behavior: "smooth" });
+  };
+
+
+  // Helper: Find Vendor Name using ID
+  const getVendorNameForCard = (req) => {
+      if (!req.vendorId) return "Not Assigned";
+      if (typeof req.vendorId === 'object' && req.vendorId.name) return req.vendorId.name;
       const found = vendors.find(v => v._id === String(req.vendorId));
       if (found) return found.name;
-      
-      // 4. Fallback
       return "Unknown Vendor"; 
   };
 
-  // 🟢 LOAD DATA INTO FORM (SYNC VENDOR & PRICE)
+  // LOAD TRADING REQUEST
   const handleLoadRequest = (req) => {
     setActiveTab("FG");
 
     let matchedVendorId = "";
-    
-    // Logic to find the correct Vendor ID for the dropdown
     if (req.vendorId) {
       if (typeof req.vendorId === "object" && req.vendorId._id) {
         matchedVendorId = req.vendorId._id;
       } else {
-        // It's a string ID or Name
         const directMatch = vendors.find((v) => v._id === req.vendorId);
         if (directMatch) {
           matchedVendorId = directMatch._id;
         } else {
-          // Fallback search by Name (just in case)
           const nameMatch = vendors.find(
             (v) => v.name.toLowerCase().trim() === String(req.vendorId).toLowerCase().trim()
           );
@@ -104,11 +128,11 @@ export default function ProcurementPage() {
     }
 
     setFormData({
-      vendor: matchedVendorId, // Sets the Dropdown
+      vendor: matchedVendorId, 
       itemId: req.productId?._id,
       itemType: "Finished Good",
       qty: req.totalQty,
-      unitPrice: req.unitCost || req.cost || "", // Sets the Cost/Rate
+      unitPrice: req.unitCost || req.cost || "", 
     });
 
     setSelectedJobId(req._id);
@@ -196,7 +220,54 @@ export default function ProcurementPage() {
           </button>
         </div>
 
-        {/* --- PENDING FULL-BUY REQUESTS TABULAR SECTION (UPDATED) --- */}
+        {/* 🟢 CRITICAL STOCK ALERT SECTION */}
+        {criticalMaterials.length > 0 && (
+          <div className="bg-white border border-red-100 rounded-2xl shadow-sm overflow-hidden animate-in slide-in-from-top-4">
+             <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between">
+                <h3 className="font-bold text-lg text-red-800 flex items-center gap-2">
+                  <FiActivity className="text-red-600" /> Critical Stock Levels
+                </h3>
+                <span className="bg-red-600 text-white text-xs font-black px-3 py-1 rounded-full animate-pulse">
+                   {criticalMaterials.length} Items Low
+                </span>
+             </div>
+             <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                   <thead>
+                      <tr className="bg-red-50/30 text-red-900/50 uppercase text-[10px] font-bold border-b border-red-50">
+                         <th className="px-6 py-3">Material Name</th>
+                         <th className="px-6 py-3">Current Stock</th>
+                         <th className="px-6 py-3">Safety Level</th>
+                         <th className="px-6 py-3">Deficit</th>
+                         <th className="px-6 py-3 text-right">Action</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-red-50">
+                      {criticalMaterials.map((m) => (
+                         <tr key={m._id} className="hover:bg-red-50/40 transition-colors">
+                            <td className="px-6 py-3 font-bold text-slate-800">{m.name}</td>
+                            <td className="px-6 py-3 font-mono font-bold text-red-600">{m.stock?.current || 0} {m.unit}</td>
+                            <td className="px-6 py-3 font-mono text-slate-500">{m.safetyStock || 0} {m.unit}</td>
+                            <td className="px-6 py-3 font-mono font-bold text-slate-700">
+                               - {((m.safetyStock || 0) - (m.stock?.current || 0)).toFixed(2)}
+                            </td>
+                            <td className="px-6 py-3 text-right">
+                               <button 
+                                  onClick={() => handleRestock(m)}
+                                  className="text-xs font-bold bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 ml-auto shadow-md shadow-red-100 transition-all"
+                               >
+                                  <FiRefreshCw /> Restock
+                               </button>
+                            </td>
+                         </tr>
+                      ))}
+                   </tbody>
+                </table>
+             </div>
+          </div>
+        )}
+
+        {/* PENDING FULL-BUY REQUESTS */}
         {pendingTrades.length > 0 && (
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-in slide-in-from-top-4">
             <div className="bg-purple-50 px-6 py-4 border-b border-purple-100 flex items-center justify-between">

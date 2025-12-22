@@ -70,8 +70,8 @@ export default function ClientsPage() {
   // Data State
   const [clients, setClients] = useState([]);
   const [quotes, setQuotes] = useState([]);
-  const [usersList, setUsersList] = useState([]); // 🟢 Store list of Salesmen
-  const [currentUser, setCurrentUser] = useState(null); // 🟢 Store Logged In User
+  const [usersList, setUsersList] = useState([]); // 🟢 Store list of Salesmen for Admin dropdown
+  const [currentUser, setCurrentUser] = useState(null); // 🟢 Store Logged In User Info
 
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -87,27 +87,31 @@ export default function ClientsPage() {
   useEffect(() => {
     fetchData();
     
-    // 🟢 1. Load Logged In User
+    // 🟢 1. Load Logged In User from LocalStorage
     const storedUser = localStorage.getItem("userInfo");
     if (storedUser) {
         const parsed = JSON.parse(storedUser);
         setCurrentUser(parsed);
-        // Default the form to their name immediately
-        setFormData(prev => ({ ...prev, salesPerson: parsed.name }));
+        // If they are not Admin, default the form to their name immediately
+        if (parsed.role !== 'Admin' && parsed.role !== 'Manager') {
+             setFormData(prev => ({ ...prev, salesPerson: parsed.name }));
+        }
     }
   }, []);
 
   const fetchData = async () => {
     try {
       const [clientsRes, quotesRes, usersRes] = await Promise.all([
-        api.get("/sales/clients"),
+        api.get("/sales/clients"), // 🟢 Backend filters this automatically based on Token
         api.get("/sales/quotes"),
-        api.get("/users") // 🟢 Fetch Users for Dropdown
+        api.get("/auth/users") // 🟢 Updated path to fetch users for Admin Dropdown
       ]);
       setClients(clientsRes.data);
       setQuotes(quotesRes.data || []);
       setUsersList(usersRes.data || []);
-    } catch (error) { console.error("Error loading data:", error); }
+    } catch (error) { 
+        console.error("Error loading data:", error); 
+    }
   };
 
   const hasQuote = (clientId) => {
@@ -132,7 +136,7 @@ export default function ClientsPage() {
           salesPerson: defaultSalesPerson 
       });
     } catch (error) {
-      alert("Error adding customer");
+      alert("Error adding customer: " + (error.response?.data?.msg || error.message));
     } finally {
       setLoading(false);
     }
@@ -145,7 +149,9 @@ export default function ClientsPage() {
       c.gstNumber?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // 
   // 🟢 LOGIC: Is the Sales Person Field Locked?
+  // Locked for everyone EXCEPT Admin and Manager
   const isSalesPersonLocked = currentUser && (currentUser.role !== 'Admin' && currentUser.role !== 'Manager');
 
   return (
@@ -267,7 +273,7 @@ export default function ClientsPage() {
                 </div>
             </div>
 
-            {/* 🟢 NEW: COMMERCIAL TERMS WITH SALES PERSON ASSIGNMENT */}
+            {/* Commercial Terms */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><FiCreditCard className="text-emerald-500" /> Commercial Terms</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -293,7 +299,7 @@ export default function ClientsPage() {
                         </label>
                         
                         {isSalesPersonLocked ? (
-                            // LOCKED INPUT (For Sales Reps)
+                            // LOCKED INPUT (For Sales Reps: They see their own name)
                             <div className="relative">
                                 <input 
                                     type="text" 
@@ -304,7 +310,7 @@ export default function ClientsPage() {
                                 <span className="absolute right-3 top-3 text-[10px] text-slate-400 font-bold uppercase">Locked</span>
                             </div>
                         ) : (
-                            // UNLOCKED DROPDOWN (For Admin/Manager)
+                            // UNLOCKED DROPDOWN (For Admin/Manager: They can assign anyone)
                             <select 
                                 name="salesPerson" 
                                 value={formData.salesPerson} 
