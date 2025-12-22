@@ -17,7 +17,7 @@ export default function ViewRecipeModal({ product, onClose }) {
               <FiLayers className="text-blue-600" /> {product.name}
             </h3>
             <p className="text-xs text-slate-500 font-bold mt-0.5 uppercase tracking-wider">
-              Recipe for 1 Unit • SKU: {product.idDisplay}
+              BOM of 1 Unit • SKU: {product.idDisplay}
             </p>
           </div>
           <button 

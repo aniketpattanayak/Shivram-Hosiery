@@ -196,67 +196,83 @@ export default function ProcurementPage() {
           </button>
         </div>
 
-        {/* --- PENDING FULL-BUY REQUESTS CARD SECTION --- */}
+        {/* --- PENDING FULL-BUY REQUESTS TABULAR SECTION (UPDATED) --- */}
         {pendingTrades.length > 0 && (
-          <div className="bg-purple-50 border border-purple-100 p-6 rounded-2xl animate-in slide-in-from-top-4">
-            <h3 className="font-bold text-lg text-purple-900 flex items-center gap-2 mb-4">
-              <FiAlertCircle /> Pending Full-Buy Requests
-              <span className="bg-purple-200 text-purple-800 text-xs px-2 py-1 rounded-full">
-                {pendingTrades.length}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-in slide-in-from-top-4">
+            <div className="bg-purple-50 px-6 py-4 border-b border-purple-100 flex items-center justify-between">
+              <h3 className="font-bold text-lg text-purple-900 flex items-center gap-2">
+                <FiAlertCircle /> Pending Full-Buy Requests
+              </h3>
+              <span className="bg-purple-600 text-white text-xs font-black px-2.5 py-1 rounded-full">
+                {pendingTrades.length} Action Items
               </span>
-            </h3>
+            </div>
             
-            <div className="grid gap-3">
-              {pendingTrades.map((req) => {
-                // 🟢 USE THE HELPER TO GET THE NAME
-                const vendorName = getVendorNameForCard(req);
-                const rate = req.unitCost || req.cost || 0;
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100 text-[10px] uppercase tracking-widest text-slate-500 font-bold">
+                    <th className="px-6 py-4">Request ID</th>
+                    <th className="px-6 py-4">Product Details</th>
+                    <th className="px-6 py-4">Assigned Vendor</th>
+                    <th className="px-6 py-4">Quantity</th>
+                    <th className="px-6 py-4">Negotiated Rate</th>
+                    <th className="px-6 py-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pendingTrades.map((req) => {
+                    const vendorName = getVendorNameForCard(req);
+                    const rate = req.unitCost || req.cost || 0;
 
-                return (
-                  <div
-                    key={req._id}
-                    className="bg-white p-4 rounded-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between border border-purple-100 gap-4"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
-                          {req.jobId}
-                        </span>
-                        <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase">
-                          FULL BUY
-                        </span>
-                      </div>
-                      
-                      <h4 className="font-bold text-lg text-slate-800 mb-2">
-                        {req.productId?.name || "Unknown Product"}
-                      </h4>
-                      
-                      {/* 🟢 DISPLAY VENDOR AND RATE */}
-                      <div className="flex flex-wrap gap-4 text-xs">
-                          <div className="flex items-center gap-1.5 text-slate-500 font-medium">
-                              <div className="p-1 bg-blue-50 text-blue-600 rounded"><FiBox /></div>
-                              Qty: <strong className="text-slate-900">{req.totalQty} Units</strong>
+                    return (
+                      <tr key={req._id} className="hover:bg-slate-50 transition-colors group">
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">
+                            {req.jobId}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-800 text-sm">
+                            {req.productId?.name || "Unknown Product"}
                           </div>
-                          <div className="flex items-center gap-1.5 text-slate-500 font-medium">
-                              <div className="p-1 bg-amber-50 text-amber-600 rounded"><FiUser /></div>
-                              Vendor: <strong className="text-slate-900">{vendorName}</strong>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="bg-purple-100 text-purple-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase">
+                              Full Buy
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1.5 text-slate-500 font-medium">
-                              <div className="p-1 bg-emerald-50 text-emerald-600 rounded"><FiTag /></div>
-                              Rate: <strong className="text-slate-900">₹{rate}</strong>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 text-slate-600 font-semibold text-xs">
+                            <FiUser className="text-slate-400" />
+                            {vendorName}
                           </div>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => handleLoadRequest(req)}
-                      className="bg-slate-900 text-white px-5 py-3 rounded-xl text-xs font-bold hover:bg-purple-600 transition-colors flex items-center gap-2 shadow-lg shadow-slate-200 whitespace-nowrap"
-                    >
-                      Create PO <FiArrowDown />
-                    </button>
-                  </div>
-                );
-              })}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
+                            <FiBox className="text-blue-500" />
+                            {req.totalQty} Units
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-1 text-emerald-600 font-black text-sm">
+                            <FiTag className="text-emerald-400" size={14} />
+                            ₹{rate.toLocaleString()}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => handleLoadRequest(req)}
+                            className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-bold hover:bg-purple-600 transition-all flex items-center gap-2 ml-auto shadow-md shadow-slate-200"
+                          >
+                            Prepare PO <FiArrowDown />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -444,7 +460,7 @@ export default function ProcurementPage() {
           </div>
         </div>
 
-        {/* VENDOR MODAL CODE ... (Same as before) */}
+        {/* VENDOR MODAL */}
         {showVendorModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-100">

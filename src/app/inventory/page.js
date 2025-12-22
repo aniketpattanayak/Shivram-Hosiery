@@ -151,7 +151,7 @@ export default function InventoryPage() {
                     
                     {item.type === 'Finished Good' && (
                         <button onClick={() => setSelectedRecipeProduct(item)} className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1 mt-1">
-                            <FiClipboard size={10} /> View Recipe
+                            <FiClipboard size={10} /> View BOM
                         </button>
                     )}
                   </td>

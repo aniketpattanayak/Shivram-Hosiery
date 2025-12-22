@@ -1,25 +1,30 @@
+// frontend/src/app/production/StrategyModal.js
 'use client';
 import { useState, useEffect } from 'react';
 import { FiX, FiPlus, FiTrash2, FiSave } from 'react-icons/fi';
 import api from '@/utils/api';
 
 export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggregatedPlans }) {
-  const totalRequired = plan.totalQtyToMake;
+  // 🟢 CALCULATE LIMITS FOR PARTIAL PLANNING
+  const totalOrder = plan.totalQtyToMake;
+  const alreadyPlanned = plan.plannedQty || 0;
+  // If global, use aggregated unplanned, otherwise calc single
+  const remainingToPlan = isGlobal ? plan.unplannedQty : (totalOrder - alreadyPlanned);
+
   const [loading, setLoading] = useState(false);
   const [vendors, setVendors] = useState([]);
   
-  // 🟢 SPLIT STATE
+  // 🟢 INITIAL SPLIT QTY = REMAINING
   const [splits, setSplits] = useState([
     { 
-      id: "init-1", // Fixed ID for the first row
-      qty: totalRequired, 
+      id: "init-1", 
+      qty: remainingToPlan, // Default to remaining
       mode: 'Manufacturing', 
       routing: {
         cutting: { type: 'In-House', vendorName: '' },
         stitching: { type: 'Job Work', vendorName: '' },
         packing: { type: 'In-House', vendorName: '' }
       },
-      // 🟢 Initial State uses vendorId
       trading: { vendorId: '', cost: 0 } 
     }
   ]);
@@ -37,14 +42,13 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
   const jobWorkers = vendors.filter(v => v.category === 'Job Worker');
   const traders = vendors.filter(v => v.category === 'Full Service Factory' || v.category === 'Trading');
 
-  // 🟢 FIXED: Add Split now creates the CORRECT structure
   const addSplit = () => {
     const used = splits.reduce((acc, s) => acc + (Number(s.qty) || 0), 0);
-    const remaining = totalRequired - used;
-    if (remaining <= 0) return alert("Total quantity is already assigned.");
+    const remaining = remainingToPlan - used;
+    if (remaining <= 0) return alert("All remaining quantity is already assigned.");
 
     setSplits([...splits, {
-      id: `split-${Date.now()}-${Math.random()}`, // Unique ID
+      id: `split-${Date.now()}-${Math.random()}`, 
       qty: remaining,
       mode: 'Manufacturing',
       routing: {
@@ -52,7 +56,6 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
         stitching: { type: 'Job Work', vendorName: '' },
         packing: { type: 'In-House', vendorName: '' }
       },
-      // 🟢 THIS WAS THE PROBLEM. NOW IT IS FIXED:
       trading: { vendorId: '', cost: 0 } 
     }]);
   };
@@ -83,11 +86,12 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
     setSplits(splits.map(s => s.id === id ? { ...s, trading: { ...s.trading, [field]: value } } : s));
   };
 
+  // 🟢 VALIDATION: Must not exceed REMAINING, but CAN be less
   const totalAssigned = splits.reduce((acc, s) => acc + (Number(s.qty) || 0), 0);
-  const isValid = totalAssigned === totalRequired;
+  const isValid = totalAssigned > 0 && totalAssigned <= remainingToPlan;
 
   const handleSubmit = async () => {
-    if(!isValid) return alert(`Total assigned (${totalAssigned}) must match Order Qty (${totalRequired})`);
+    if(!isValid) return alert(`Total assigned (${totalAssigned}) cannot exceed Remaining (${remainingToPlan})`);
     
     setLoading(true);
     try {
@@ -101,8 +105,6 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
         if (s.mode === 'Manufacturing') {
             base.routing = s.routing;
         } else {
-            // 🟢 Ensure we grab the ID correctly
-            // Defensive coding: if trading is somehow undefined, default to empty
             const t = s.trading || { vendorId: '', cost: 0 };
             base.vendorId = t.vendorId; 
             base.cost = t.cost;
@@ -110,16 +112,17 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
         return base;
       });
 
-      // Debug Log for Frontend
-      console.log("📤 Sending to Backend:", formattedSplits);
+      const payload = { planId: plan._id, splits: formattedSplits };
 
-      const payload = { status: 'Scheduled', splits: formattedSplits };
-
+      // Backend now handles partials automatically
       if (isGlobal && aggregatedPlans?.length) {
-        await api.post('/production/confirm-strategy', { ...payload, planIds: aggregatedPlans.map(p => p._id) });
+         // Note: Global partials are complex, backend will distribute or error.
+         // For now we map to the first plan or send array if backend supports it.
+         // Assuming single plan focus for this partial update based on previous context.
+         // If global, we might just send the array of IDs.
+         await api.post('/production/confirm-strategy', { ...payload, planIds: aggregatedPlans.map(p => p._id) });
       } else {
-        const validId = plan._id || plan.id || plan.planId;
-        await api.post('/production/confirm-strategy', { ...payload, planId: validId });
+         await api.post('/production/confirm-strategy', payload);
       }
       onSuccess();
     } catch (error) {
@@ -141,20 +144,23 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-full"><FiX size={20} /></button>
         </div>
 
-        <div className="p-6 overflow-y-auto flex-grow bg-slate-50/50">
-            <div className="flex justify-between items-end mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <div>
-                    <span className="text-xs font-bold text-slate-400 uppercase">Total Order</span>
-                    <div className="text-3xl font-black text-slate-900">{totalRequired} <span className="text-sm font-medium text-slate-400">units</span></div>
-                </div>
-                <div className="text-right">
-                     <span className="text-xs font-bold text-slate-400 uppercase">Unassigned</span>
-                     <div className={`text-xl font-bold ${totalAssigned === totalRequired ? 'text-green-600' : 'text-red-500'}`}>
-                        {totalRequired - totalAssigned}
-                     </div>
-                </div>
+        {/* 🟢 STATS HEADER */}
+        <div className="grid grid-cols-3 gap-4 p-6 bg-blue-50 border-b border-blue-100">
+            <div>
+                <p className="text-xs font-bold text-slate-400 uppercase">Total Order</p>
+                <p className="text-xl font-black text-slate-800">{totalOrder}</p>
             </div>
+            <div>
+                <p className="text-xs font-bold text-slate-400 uppercase">Already Planned</p>
+                <p className="text-xl font-bold text-blue-600">{alreadyPlanned}</p>
+            </div>
+            <div>
+                <p className="text-xs font-bold text-slate-400 uppercase">Remaining to Plan</p>
+                <p className="text-xl font-black text-red-600">{remainingToPlan}</p>
+            </div>
+        </div>
 
+        <div className="p-6 overflow-y-auto flex-grow bg-slate-50/50">
             <div className="space-y-4">
                 {splits.map((split, index) => (
                     <div key={split.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-bottom-2">
@@ -234,13 +240,13 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
                         </div>
                     </div>
                 ))}
-                <button onClick={addSplit} disabled={totalAssigned >= totalRequired} className="w-full py-3 border-2 border-dashed border-slate-300 text-slate-400 font-bold rounded-xl hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><FiPlus /> Add Another Split</button>
+                <button onClick={addSplit} disabled={totalAssigned >= remainingToPlan} className="w-full py-3 border-2 border-dashed border-slate-300 text-slate-400 font-bold rounded-xl hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><FiPlus /> Add Another Split</button>
             </div>
         </div>
 
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
           <button onClick={onClose} className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-lg">Cancel</button>
-          <button onClick={handleSubmit} disabled={!isValid || loading} className="px-6 py-2.5 bg-slate-900 hover:bg-black text-white font-bold rounded-lg shadow-lg flex items-center gap-2 disabled:opacity-50">{loading ? 'Saving...' : <><FiSave /> Confirm All Splits</>}</button>
+          <button onClick={handleSubmit} disabled={!isValid || loading} className="px-6 py-2.5 bg-slate-900 hover:bg-black text-white font-bold rounded-lg shadow-lg flex items-center gap-2 disabled:opacity-50">{loading ? 'Saving...' : <><FiSave /> Confirm Splits</>}</button>
         </div>
       </div>
     </div>

@@ -4,7 +4,8 @@ import api from "@/utils/api";
 import AuthGuard from '@/components/AuthGuard';
 import {
   FiBox, FiScissors, FiLayers, FiPackage, FiCheckCircle, 
-  FiArrowRight, FiClock, FiSearch, FiFilter, FiX, FiActivity, FiMapPin, FiAlertTriangle, FiUser
+  FiArrowRight, FiClock, FiSearch, FiFilter, FiX, FiActivity, 
+  FiMapPin, FiAlertTriangle, FiUser, FiChevronsRight, FiList, FiCheckSquare
 } from "react-icons/fi";
 
 const WORKFLOW_STEPS = [
@@ -20,10 +21,12 @@ export default function ShopFloorPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStage, setFilterStage] = useState("ALL");
-  const [pickingFeedback, setPickingFeedback] = useState({});
+  
+  // 🟢 Stores the "Just Issued" picking list from backend response
+  const [pickingFeedback, setPickingFeedback] = useState({}); 
+  
   const [selectedJob, setSelectedJob] = useState(null);
 
-  // Custom Confirmation Popup State
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     title: "",
@@ -56,7 +59,12 @@ export default function ShopFloorPage() {
         onConfirm: async () => {
             try {
                 const res = await api.post("/shopfloor/issue", { jobId });
-                if (res.data.pickingList) setPickingFeedback(prev => ({ ...prev, [jobId]: res.data.pickingList }));
+                
+                // 🟢 CAPTURE PICKING LIST
+                if (res.data.pickingList) {
+                    setPickingFeedback(prev => ({ ...prev, [jobId]: res.data.pickingList }));
+                }
+                
                 fetchData();
             } catch (e) { alert("Error: " + e.message); }
             setConfirmDialog({ isOpen: false });
@@ -79,13 +87,18 @@ export default function ShopFloorPage() {
       });
   };
 
-  // --- LOGIC HELPERS ---
   const getStepStatus = (currentStepId, stepId) => {
     const currentIndex = WORKFLOW_STEPS.findIndex(s => s.id === currentStepId);
     const stepIndex = WORKFLOW_STEPS.findIndex(s => s.id === stepId);
     if (stepIndex < currentIndex) return 'completed';
     if (stepIndex === currentIndex) return 'active';
     return 'pending';
+  };
+
+  const getNextStepLabel = (currentStepId) => {
+    const currentIndex = WORKFLOW_STEPS.findIndex(s => s.id === currentStepId);
+    if (currentIndex === -1 || currentIndex === WORKFLOW_STEPS.length - 1) return "Finish";
+    return WORKFLOW_STEPS[currentIndex + 1].label;
   };
 
   const getActionConfig = (currentStep, jobId) => {
@@ -149,16 +162,23 @@ export default function ShopFloorPage() {
                 <tr>
                     <th className="p-4 w-56">Job & Product Info</th>
                     <th className="p-4 text-center">Process Pipeline</th> 
-                    <th className="p-4">Location / Vendor</th>
-                    <th className="p-4 text-right">Action</th>
+                    <th className="p-4">Location / Next Step</th>
+                    <th className="p-4 text-right">Action / Picking List</th>
                 </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
                 {filteredJobs.map((job) => {
                     const action = getActionConfig(job.currentStep, job.jobId);
+                    
+                    // 🟢 PRIORITY 1: Immediate Feedback (Just clicked Issue)
                     const feedback = pickingFeedback[job.jobId];
+                    
+                    // 🟢 PRIORITY 2: Saved History (Page Reloaded)
+                    // If no immediate feedback, check if job has recorded issued materials
+                    const hasHistory = !feedback && job.issuedMaterials && job.issuedMaterials.length > 0;
 
-                    // Determine current vendor/location based on active step
+                    const nextStepLabel = getNextStepLabel(job.currentStep);
+
                     let currentLocation = "Store";
                     let isJobWork = false;
                     const stepObj = WORKFLOW_STEPS.find(s => s.id === job.currentStep);
@@ -169,18 +189,27 @@ export default function ShopFloorPage() {
                         currentLocation = isJobWork ? `Vendor: ${route.vendorName}` : "In-House";
                     }
 
+                    const displayLot = job.lotNumber || job.batchNumber || job.planId?.batchNumber;
+
                     return (
                         <tr key={job._id} className="hover:bg-slate-50/50 transition-colors">
-                            {/* 1. Job Info with SKU and Client */}
+                            {/* 1. Job Info */}
                             <td className="p-4 align-top">
-                                <span className="font-mono text-blue-600 font-bold text-[10px] bg-blue-50 px-2 py-0.5 rounded">{job.jobId}</span>
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
+                                    <span className="font-mono text-blue-600 font-bold text-[10px] bg-blue-50 px-2 py-0.5 rounded">{job.jobId}</span>
+                                    {displayLot && (
+                                        <span className="font-mono text-purple-600 font-bold text-[10px] bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
+                                            LOT: {displayLot}
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="font-bold text-slate-800 text-sm mt-1">{job.productId?.name}</div>
                                 <div className="text-[10px] text-slate-400 font-mono mt-0.5">{job.productId?.sku || "NO-SKU"}</div>
                                 <div className="text-[10px] text-slate-500 font-bold mt-2 uppercase">Qty: {job.totalQty} | <span className="text-slate-400 font-medium">Client: {job.planId?.clientName || "Internal"}</span></div>
                                 <button onClick={() => setSelectedJob(job)} className="text-[10px] text-blue-500 font-bold flex items-center gap-1 mt-3 hover:underline tracking-tight"><FiClock/> VIEW HISTORY LOG</button>
                             </td>
 
-                            {/* 2. Visual Pipeline with Timestamps */}
+                            {/* 2. Pipeline */}
                             <td className="p-4 align-middle">
                                 <div className="flex items-center justify-center w-full max-w-lg mx-auto relative px-4">
                                     <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 -z-10"></div>
@@ -201,28 +230,75 @@ export default function ShopFloorPage() {
                                 </div>
                             </td>
 
-                            {/* 3. Real Location Info */}
+                            {/* 3. Location */}
                             <td className="p-4 align-top">
-                                <div className={`flex items-start gap-2 text-xs font-bold ${isJobWork ? "text-amber-600" : "text-slate-600"}`}>
-                                    <FiMapPin className="mt-0.5" />
-                                    <div>
+                                <div className={`flex flex-col gap-1 text-xs font-bold ${isJobWork ? "text-amber-600" : "text-slate-600"}`}>
+                                    <div className="flex items-center gap-2">
+                                        <FiMapPin className="mt-0.5" />
                                         <span>{currentLocation}</span>
-                                        {isJobWork && <div className="text-[9px] bg-amber-50 px-1 py-0.5 rounded mt-1 border border-amber-100 uppercase tracking-tighter">Job Work Active</div>}
+                                    </div>
+                                    {isJobWork && <div className="text-[9px] bg-amber-50 px-1 py-0.5 rounded border border-amber-100 uppercase tracking-tighter w-fit ml-6">Job Work Active</div>}
+                                    <div className="flex items-center gap-1 text-slate-400 mt-1 ml-6 text-[10px]">
+                                        <FiChevronsRight /> Next: <span className="text-slate-600 font-bold uppercase">{nextStepLabel}</span>
                                     </div>
                                 </div>
                             </td>
 
-                            {/* 4. Action Buttons */}
-                            <td className="p-4 text-right align-middle">
+                            {/* 4. Action & Picking List */}
+                            <td className="p-4 text-right align-top w-80">
                                 {action ? (
-                                    <button onClick={action.action} className={`px-4 py-2 text-white text-[11px] font-black rounded-lg shadow-sm active:scale-95 transition-all ${action.color}`}>
+                                    <button onClick={action.action} className={`px-4 py-2 text-white text-[11px] font-black rounded-lg shadow-sm active:scale-95 transition-all ${action.color} mb-2`}>
                                         {action.text} <FiArrowRight className="inline ml-1"/>
                                     </button>
                                 ) : <span className="text-xs italic text-slate-300">In Process</span>}
 
-                                {feedback && (
-                                    <div className="mt-2 text-[9px] text-emerald-600 font-bold bg-emerald-50 p-2 rounded border border-emerald-100">
-                                        Issued: {feedback.length} Fabrics
+                                {/* 🟢 1. DISPLAY IMMEDIATE FEEDBACK (If available) */}
+                                {feedback && Array.isArray(feedback) && (
+                                    <div className="text-left mt-2 bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-[10px] shadow-sm animate-in slide-in-from-top-1">
+                                        <div className="font-bold text-emerald-800 mb-2 flex items-center gap-1 border-b border-emerald-200 pb-1">
+                                            <FiList size={10} /> PICKING LIST
+                                        </div>
+                                        <div className="space-y-3">
+                                            {feedback.map((item, idx) => (
+                                                <div key={idx}>
+                                                    <div className="flex justify-between font-bold text-slate-700 mb-0.5">
+                                                        <span className="flex items-center gap-1"><FiCheckSquare size={10} className="text-emerald-500"/> {item.materialName}</span>
+                                                        <span className="bg-white px-1 rounded border border-slate-200">Qty: {item.totalQty}</span>
+                                                    </div>
+                                                    {item.batches && item.batches.length > 0 ? (
+                                                        <div className="pl-2 space-y-0.5 border-l-2 border-emerald-300 ml-1">
+                                                            {item.batches.map((batch, bIdx) => (
+                                                                <div key={bIdx} className="flex justify-between text-slate-500 font-mono text-[9px] bg-white/50 px-1 rounded">
+                                                                    <span>↳ Lot {batch.lotNumber}</span>
+                                                                    <span className="font-bold text-emerald-600">{batch.qty}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-amber-500 italic pl-4 text-[9px]">Check Stock (Auto)</div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 🟢 2. DISPLAY SAVED HISTORY (If no immediate feedback) */}
+                                {hasHistory && (
+                                    <div className="text-left mt-2 bg-slate-50 border border-slate-200 rounded-lg p-3 text-[10px] shadow-sm">
+                                        <div className="font-bold text-slate-600 mb-2 flex items-center gap-1 border-b border-slate-200 pb-1">
+                                            <FiCheckCircle size={10} /> ISSUED MATERIAL
+                                        </div>
+                                        <div className="space-y-1">
+                                            {job.issuedMaterials.map((item, idx) => (
+                                                <div key={idx} className="flex justify-between text-slate-500 font-mono text-[9px] bg-white px-2 py-1 rounded border border-slate-100">
+                                                    <span>{item.materialName}</span>
+                                                    <span>
+                                                        Lot <span className="font-bold text-slate-700">{item.lotNumber}</span>: <span className="font-bold text-blue-600">{item.qtyIssued}</span>
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
                             </td>
@@ -233,7 +309,7 @@ export default function ShopFloorPage() {
         </table>
       </div>
 
-      {/* CUSTOM CONFIRMATION POPUP */}
+      {/* CONFIRMATION DIALOG & MODALS (Kept same as before) */}
       {confirmDialog.isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden p-8 text-center animate-in zoom-in-95">
@@ -248,7 +324,6 @@ export default function ShopFloorPage() {
         </div>
       )}
 
-      {/* HISTORY LOG MODAL */}
       {selectedJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">

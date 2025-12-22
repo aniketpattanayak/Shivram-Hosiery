@@ -1,8 +1,10 @@
-// frontend/src/app/production/page.js
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { FiScissors, FiCheckCircle, FiTrash2, FiClock, FiLayers, FiList } from 'react-icons/fi';
+import { 
+  FiScissors, FiCheckCircle, FiTrash2, FiClock, 
+  FiLayers, FiList
+} from 'react-icons/fi';
 import StrategyModal from './StrategyModal';
 import api from '@/utils/api';
 import AuthGuard from '@/components/AuthGuard';
@@ -12,8 +14,8 @@ export default function ProductionPage() {
   const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState(null); 
   
-  // --- NEW STATE: View Mode ---
-  const [viewMode, setViewMode] = useState('normal'); // 'normal' | 'global'
+  // --- VIEW MODE: 'normal' (Individual) or 'global' (Aggregated) ---
+  const [viewMode, setViewMode] = useState('normal'); 
 
   useEffect(() => {
     fetchPlans();
@@ -42,44 +44,55 @@ export default function ProductionPage() {
     }
   };
 
-  // --- NEW LOGIC: Group Plans by Product ---
+  // --- LOGIC: Group Plans by Product (Global View) ---
   const globalPlans = useMemo(() => {
-    if (viewMode === 'normal') return plans;
+    if (viewMode !== 'global') return [];
 
-    // Grouping Logic
     const groups = {};
     
     plans.forEach(plan => {
-      // Use Product ID as key
       const prodId = plan.product?._id || 'unknown';
       
       if (!groups[prodId]) {
-        // Initialize the Group
         groups[prodId] = {
-          _id: `GLOBAL-${prodId}`, // Virtual ID
-          isGlobal: true,          // Flag to identify
-          product: plan.product,   // Keep product details
+          _id: `GLOBAL-${prodId}`, 
+          isGlobal: true,          
+          product: plan.product,   
           totalQtyToMake: 0,
-          aggregatedPlans: []      // Store the original plans here
+          plannedQty: 0, 
+          unplannedQty: 0, 
+          count: 0,
+          aggregatedPlans: [],
+          linkedJobIds: [] 
         };
       }
       
-      // Accumulate
-      groups[prodId].totalQtyToMake += plan.totalQtyToMake;
+      const total = plan.totalQtyToMake;
+      const planned = plan.plannedQty || 0;
+      const unplanned = total - planned;
+
+      groups[prodId].totalQtyToMake += total;
+      groups[prodId].plannedQty += planned;
+      groups[prodId].unplannedQty += unplanned;
+      groups[prodId].count += 1;
       groups[prodId].aggregatedPlans.push(plan);
+      
+      if(plan.linkedJobIds && plan.linkedJobIds.length > 0) {
+        groups[prodId].linkedJobIds.push(...plan.linkedJobIds);
+      }
     });
 
     return Object.values(groups);
   }, [plans, viewMode]);
 
-
-  // --- BATCH STRATEGY HANDLER ---
-  // If we confirm strategy on a "Global" card, we apply it to all children
   const handleGlobalSuccess = async () => {
      setSelectedPlan(null);
      alert("Batch Strategy Applied Successfully! ✅");
-     fetchPlans(); // Refresh to clear the processed items
+     fetchPlans(); 
   };
+
+  // 🟢 DETERMINE DATA SOURCE
+  const activeData = viewMode === 'normal' ? plans : globalPlans;
 
   return (
     <AuthGuard requiredPermission="production">
@@ -92,7 +105,7 @@ export default function ProductionPage() {
           <p className="text-slate-500 mt-2 text-sm font-medium">Review sales demand and assign execution strategies.</p>
         </div>
         
-        {/* --- NEW: Radio Buttons for View Mode --- */}
+        {/* --- VIEW MODE SWITCHER --- */}
         <div className="bg-slate-100 p-1 rounded-xl flex font-bold text-sm">
            <button 
              onClick={() => setViewMode('normal')}
@@ -104,7 +117,7 @@ export default function ProductionPage() {
              onClick={() => setViewMode('global')}
              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${viewMode === 'global' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
            >
-             <FiLayers /> Global View
+             <FiLayers /> Global Batch
            </button>
         </div>
       </div>
@@ -112,7 +125,7 @@ export default function ProductionPage() {
       {/* Content */}
       {loading ? (
         <div className="p-12 text-center text-slate-400 font-medium">Loading Plans...</div>
-      ) : globalPlans.length === 0 ? (
+      ) : plans.length === 0 ? (
         <div className="bg-white p-16 rounded-3xl border border-slate-100 shadow-sm text-center flex flex-col items-center">
           <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-4">
             <FiCheckCircle size={32} />
@@ -121,81 +134,117 @@ export default function ProductionPage() {
           <p className="text-slate-500 mt-2">No pending orders require planning.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {globalPlans.map((plan) => (
-            <div key={plan._id} className={`p-6 rounded-2xl border shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-6 group 
-                ${plan.isGlobal ? 'bg-blue-50/50 border-blue-100' : 'bg-white border-slate-200'}`}>
-              
-              {/* Plan Info */}
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider 
-                      ${plan.isGlobal ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'}`}>
-                    {plan.product?.name || 'Unknown Product'}
-                  </span>
-                  
-                  {/* Show Order ID (Normal) OR Count (Global) */}
-                  {plan.isGlobal ? (
-                     <span className="text-xs font-bold text-blue-600 flex items-center gap-1">
-                       <FiLayers /> Aggregating {plan.aggregatedPlans.length} Orders
-                     </span>
-                  ) : (
-                     <span className="text-xs text-slate-400 font-mono">
-                       Order {plan.orderId ? `#${plan.orderId.orderId}` : 'Unknown'}
-                     </span>
-                  )}
-                </div>
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            {/* --- UNIFIED TABLE VIEW --- */}
+            <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                    <tr>
+                        <th className="p-4 border-b w-64">Ref / Order</th>
+                        <th className="p-4 border-b">Product</th>
+                        <th className="p-4 border-b text-right">Total Order</th>
+                        <th className="p-4 border-b text-right text-blue-600">Planned</th>
+                        <th className="p-4 border-b text-right text-red-600">Unplanned</th>
+                        <th className="p-4 border-b">Linked Jobs</th>
+                        <th className="p-4 border-b text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                    {activeData.map(plan => {
+                        const total = plan.totalQtyToMake;
+                        const planned = plan.plannedQty || 0;
+                        const unplanned = plan.isGlobal ? plan.unplannedQty : (total - planned);
+                        
+                        return (
+                            <tr key={plan._id} className={`hover:bg-slate-50 transition-colors ${plan.isGlobal ? 'bg-blue-50/10' : ''}`}>
+                                <td className="p-4 align-top">
+                                    {plan.isGlobal ? (
+                                        <div className="flex flex-col gap-2">
+                                            <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] uppercase tracking-wide font-bold w-fit">
+                                                BATCH ({plan.count})
+                                            </span>
+                                            {/* 🟢 SHOW ORDER NUMBERS IN GLOBAL VIEW */}
+                                            <div className="flex flex-wrap gap-1">
+                                                {plan.aggregatedPlans.map(sub => (
+                                                    <span key={sub._id} className="text-[10px] font-mono border border-slate-200 bg-white px-1.5 py-0.5 rounded text-slate-500">
+                                                        #{sub.orderId?.orderId || 'N/A'}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <span className="font-mono font-bold text-slate-600">
+                                            #{plan.orderId?.orderId || 'N/A'}
+                                        </span>
+                                    )}
+                                </td>
+                                <td className="p-4 align-top font-bold text-slate-800">
+                                    {plan.product?.name || 'Unknown Product'}
+                                    <div className="text-[10px] text-slate-400 font-normal">{plan.product?.sku}</div>
+                                </td>
+                                <td className="p-4 align-top text-right font-black text-slate-900">
+                                    {total}
+                                </td>
+                                <td className="p-4 align-top text-right font-bold text-blue-600 bg-blue-50/30">
+                                    {planned}
+                                </td>
+                                <td className="p-4 align-top text-right font-black text-red-600 bg-red-50/30">
+                                    {unplanned}
+                                </td>
+                                
+                                <td className="p-4 align-top max-w-xs">
+                                    <div className="flex flex-wrap gap-1">
+                                        {plan.linkedJobIds?.length > 0 ? (
+                                            plan.linkedJobIds.slice(0, 5).map(job => (
+                                                <span key={job} className="text-[10px] bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-slate-500 font-mono">
+                                                    {job}
+                                                </span>
+                                            ))
+                                        ) : <span className="text-slate-300 italic text-xs">-</span>}
+                                        {plan.linkedJobIds?.length > 5 && (
+                                            <span className="text-[10px] text-slate-400 pl-1">+{plan.linkedJobIds.length - 5} more</span>
+                                        )}
+                                    </div>
+                                </td>
 
-                <h3 className="text-2xl font-black text-slate-900">
-                  Make {plan.totalQtyToMake} Units
-                </h3>
-                
-                {/* Global View: Show Details of included orders */}
-                {plan.isGlobal && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                        {plan.aggregatedPlans.map(sub => (
-                            <span key={sub._id} className="text-[10px] font-mono bg-white border border-blue-100 text-blue-500 px-1.5 py-0.5 rounded">
-                                #{sub.orderId?.orderId || 'N/A'} ({sub.totalQtyToMake})
-                            </span>
-                        ))}
-                    </div>
-                )}
-
-                {!plan.isGlobal && (
-                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                      <FiClock /> Created: {new Date(plan.createdAt).toLocaleDateString()}
-                    </p>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-3">
-                {!plan.isGlobal && (
-                    <button 
-                      onClick={() => deletePlan(plan._id)}
-                      className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                    >
-                      <FiTrash2 />
-                    </button>
-                )}
-
-                <button 
-                  onClick={() => setSelectedPlan(plan)} 
-                  className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-lg 
-                      ${plan.isGlobal 
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200' 
-                        : 'bg-slate-900 hover:bg-slate-800 text-white shadow-slate-200'}`}
-                >
-                  <FiScissors /> {plan.isGlobal ? 'Batch Strategy' : 'Plan Strategy'}
-                </button>
-              </div>
-
-            </div>
-          ))}
+                                <td className="p-4 align-top text-center">
+                                    <div className="flex justify-center items-center gap-2">
+                                        {!plan.isGlobal && (
+                                            <button 
+                                                onClick={() => deletePlan(plan._id)}
+                                                className="p-2 text-slate-400 hover:text-red-600 bg-slate-100 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Delete Plan"
+                                            >
+                                                <FiTrash2 />
+                                            </button>
+                                        )}
+                                        
+                                        {unplanned > 0 ? (
+                                            <button 
+                                                onClick={() => setSelectedPlan(plan)}
+                                                className={`px-4 py-2 text-white text-xs font-bold rounded-lg flex items-center gap-2 shadow-md transition-all 
+                                                    ${plan.isGlobal ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200' : 'bg-slate-900 hover:bg-slate-800'}`}
+                                            >
+                                                <FiScissors /> {plan.isGlobal ? 'Batch Strategy' : `Plan ${unplanned}`}
+                                            </button>
+                                        ) : (
+                                            <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
+                                                <FiCheckCircle/> Done
+                                            </span>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+            
+            {activeData.length === 0 && !loading && (
+                <div className="p-12 text-center text-slate-400 font-medium">No plans available in this view.</div>
+            )}
         </div>
       )}
 
-      {/* Render Modal */}
       {selectedPlan && (
         <StrategyModal 
           plan={selectedPlan}
@@ -208,7 +257,6 @@ export default function ProductionPage() {
                  fetchPlans();
              }
           }}
-          // If it's global, we pass the sub-plans to the modal so it can loop through them
           isGlobal={selectedPlan.isGlobal}
           aggregatedPlans={selectedPlan.aggregatedPlans}
         />
