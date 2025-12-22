@@ -193,7 +193,7 @@ export default function ProductForm({ onClose, onSuccess, initialData = null }) 
             {/* Row 3: Planning Metrics */}
             <div className="grid grid-cols-3 gap-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
                 <div className="space-y-2">
-                    <label className="text-xs font-bold text-blue-700 uppercase">Daily Demand</label>
+                    <label className="text-xs font-bold text-blue-700 uppercase">Avg. Daily Consumption (ADC)</label>
                     <input type="number" className={inputClass} value={formData.avgConsumption} onChange={(e) => setFormData({ ...formData, avgConsumption: e.target.value })} />
                 </div>
                 <div className="space-y-2">

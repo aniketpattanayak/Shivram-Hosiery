@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
-import { FiPlus, FiBox, FiLayers, FiX, FiClipboard, FiEdit3 } from "react-icons/fi"; // 🟢 Added FiEdit3
+import { FiPlus, FiBox, FiLayers, FiX, FiClipboard, FiEdit3, FiPackage, FiCalendar } from "react-icons/fi"; 
 import AddMaterialModal from "./AddMaterialModal";
 import ProductForm from "@/components/ProductForm";
 import ViewRecipeModal from "./ViewRecipeModal";
@@ -13,10 +13,12 @@ export default function InventoryPage() {
   const [modalMode, setModalMode] = useState('NONE'); 
   const [selectedRecipeProduct, setSelectedRecipeProduct] = useState(null);
   
-  // 🟢 NEW: State for Edit Mode
+  // State for Edit Mode
   const [editingProduct, setEditingProduct] = useState(null);
 
-  // ... (State and fetchStock remain same) ...
+  // 🟢 NEW: State for Lot/Batch View
+  const [viewStockItem, setViewStockItem] = useState(null);
+
   const [rawMaterials, setRawMaterials] = useState([]);
   const [products, setProducts] = useState([]);
   const [filterType, setFilterType] = useState("ALL");
@@ -36,7 +38,6 @@ export default function InventoryPage() {
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
-  // ... (unifiedData logic remains same) ...
   const unifiedData = useMemo(() => {
     const formattedRM = rawMaterials.map(m => ({ ...m, type: 'Raw Material', status: m.status || 'UNKNOWN' }));
     const formattedFG = products.map(p => ({ ...p, type: 'Finished Good', status: p.status || 'UNKNOWN', bom: p.bom }));
@@ -55,7 +56,8 @@ export default function InventoryPage() {
         safety: i.safetyStock || 0,
         status: i.status,
         bom: i.bom,
-        // Pass original object for editing
+        // 🟢 Include Batches for the Popup
+        batches: i.stock?.batches || [],
         original: i 
     }));
 
@@ -64,7 +66,7 @@ export default function InventoryPage() {
     return combined;
   }, [rawMaterials, products, filterType, filterHealth]);
 
-  const getStatusBadge = (status) => { /* ... same ... */ 
+  const getStatusBadge = (status) => { 
     const s = status ? status.toUpperCase() : "UNKNOWN";
     if (s === "CRITICAL") return <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-600 border border-red-100">CRITICAL</span>;
     if (s === "MEDIUM") return <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-600 border border-orange-100">MEDIUM</span>;
@@ -73,17 +75,16 @@ export default function InventoryPage() {
     return <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500">{s}</span>;
   };
 
-  // 🟢 NEW: Handler to start editing
   const handleEditProduct = (product) => {
-      setEditingProduct(product.original); // Pass the raw data object
-      setModalMode('ADD_FG'); // Re-use the Product Form modal
+      setEditingProduct(product.original); 
+      setModalMode('ADD_FG'); 
   };
 
   return (
     <AuthGuard requiredPermission="inventory">
     <div className="space-y-8 animate-in fade-in duration-500">
       
-      {/* Header & Filters (Same as before) */}
+      {/* Header & Filters */}
       <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 border-b border-slate-200 pb-6">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Master Inventory</h1>
@@ -95,7 +96,6 @@ export default function InventoryPage() {
       </div>
 
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-end gap-6">
-        {/* ... (Keep Filter Bar code exactly as it was) ... */}
         <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Item Type</label>
             <div className="flex bg-white rounded-lg border border-slate-300 overflow-hidden w-fit">
@@ -136,7 +136,6 @@ export default function InventoryPage() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                         <div className="font-bold text-slate-800">{item.name}</div>
-                        {/* 🟢 EDIT BUTTON (Only for FG for now) */}
                         {item.type === 'Finished Good' && (
                             <button 
                                 onClick={() => handleEditProduct(item)} 
@@ -156,9 +155,23 @@ export default function InventoryPage() {
                     )}
                   </td>
                   
-                  {/* ... (Rest of columns remain same) ... */}
                   <td className="px-6 py-4">{item.type === 'Raw Material' ? <span className="text-xs font-bold text-slate-500 flex gap-1"><FiBox/> RM</span> : <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded flex gap-1 w-fit"><FiLayers/> FG</span>}</td>
-                  <td className="px-6 py-4 font-mono font-bold text-slate-600">{Number(item.current).toFixed(2)} {item.unit}</td>
+                  
+                  {/* 🟢 MODIFIED: Physical Stock Column with View Lots Button */}
+                  <td className="px-6 py-4">
+                    <div className="font-mono font-bold text-slate-600">
+                        {Number(item.current).toFixed(2)} <span className="text-[10px] text-slate-400">{item.unit}</span>
+                    </div>
+                    {item.batches && item.batches.length > 0 && (
+                        <button 
+                            onClick={() => setViewStockItem(item)}
+                            className="text-[10px] text-blue-600 font-bold hover:underline flex items-center gap-1 mt-1 bg-blue-50 px-1.5 py-0.5 rounded w-fit"
+                        >
+                            <FiPackage size={10}/> View Lots
+                        </button>
+                    )}
+                  </td>
+
                   <td className="px-6 py-4 font-mono font-bold text-amber-600 bg-amber-50/10">{Number(item.reserved).toFixed(2)}</td>
                   <td className="px-6 py-4 font-mono font-black text-slate-800">{Number(item.current - item.reserved).toFixed(2)}</td>
                   <td className="px-6 py-4 font-mono font-bold text-slate-400">{Number(item.avg * item.lead * (item.safety || 1)).toFixed(2)}</td>
@@ -172,7 +185,6 @@ export default function InventoryPage() {
 
       {/* Modals */}
       {modalMode === 'SELECTION' && (
-        /* ... (Selection Modal Code Same) ... */
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in zoom-in-95">
             <div className="bg-white rounded-2xl w-full max-w-lg p-8 shadow-2xl relative">
                 <button onClick={() => setModalMode('NONE')} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><FiX size={24}/></button>
@@ -196,7 +208,6 @@ export default function InventoryPage() {
 
       {modalMode === 'ADD_RM' && <AddMaterialModal onClose={() => setModalMode('NONE')} onSuccess={() => { setModalMode('NONE'); fetchStock(); }} />}
       
-      {/* 🟢 PASSED editingProduct into the Form */}
       {modalMode === 'ADD_FG' && (
         <ProductForm 
             initialData={editingProduct} 
@@ -206,6 +217,63 @@ export default function InventoryPage() {
       )}
       
       {selectedRecipeProduct && <ViewRecipeModal product={selectedRecipeProduct} onClose={() => setSelectedRecipeProduct(null)} />}
+
+      {/* 🟢 NEW: LOT / BATCH DETAILS POPUP */}
+      {viewStockItem && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[80vh]">
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                    <div>
+                        <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+                            <FiPackage className="text-blue-600"/> Batch / Lot Details
+                        </h3>
+                        <p className="text-xs text-slate-500 font-bold mt-0.5">{viewStockItem.name}</p>
+                    </div>
+                    <button onClick={() => setViewStockItem(null)} className="p-2 hover:bg-slate-200 rounded-full text-slate-500 transition-colors"><FiX /></button>
+                </div>
+                
+                <div className="p-0 overflow-y-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px]">
+                            <tr>
+                                <th className="px-6 py-3 border-b border-slate-100">Lot Number</th>
+                                <th className="px-6 py-3 border-b border-slate-100">Date Added</th>
+                                <th className="px-6 py-3 border-b border-slate-100 text-right">Quantity</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {viewStockItem.batches && viewStockItem.batches.length > 0 ? (
+                                viewStockItem.batches.map((batch, idx) => (
+                                    <tr key={idx} className="hover:bg-slate-50">
+                                        <td className="px-6 py-3 font-mono text-xs font-bold text-blue-600 bg-blue-50/30">
+                                            {batch.lotNumber}
+                                        </td>
+                                        <td className="px-6 py-3 text-xs text-slate-500 flex items-center gap-1">
+                                            <FiCalendar size={10} /> {new Date(batch.addedAt || Date.now()).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-6 py-3 text-right font-black text-slate-800">
+                                            {batch.qty}
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan="3" className="px-6 py-8 text-center text-slate-400 italic">
+                                        No active batches found.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div className="p-4 border-t border-slate-100 bg-slate-50 text-right flex justify-between items-center">
+                    <span className="text-xs text-slate-400 font-bold uppercase">Total Physical</span>
+                    <span className="text-xl font-black text-slate-900">{Number(viewStockItem.current).toFixed(2)}</span>
+                </div>
+            </div>
+        </div>
+      )}
 
     </div>
     </AuthGuard>

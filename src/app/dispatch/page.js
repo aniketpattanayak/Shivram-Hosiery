@@ -4,7 +4,7 @@ import api from "@/utils/api";
 import AuthGuard from '@/components/AuthGuard';
 import { 
   FiTruck, FiSearch, FiCheckCircle, FiAlertTriangle, 
-  FiMapPin, FiPackage, FiFileText, FiActivity, FiX, FiSave, FiFlag 
+  FiMapPin, FiPackage, FiFileText, FiActivity, FiX, FiSave, FiFlag, FiUser, FiPhone, FiBox, FiPrinter, FiArrowLeft
 } from "react-icons/fi";
 
 export default function LogisticsPage() {
@@ -16,7 +16,18 @@ export default function LogisticsPage() {
   // Dispatch Modal State
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [activeDispatchId, setActiveDispatchId] = useState(null);
-  const [logisticsForm, setLogisticsForm] = useState({ vehicleNo: "", trackingId: "" });
+  
+  // Logistics Form State
+  const [logisticsForm, setLogisticsForm] = useState({ 
+      vehicleNo: "", 
+      trackingId: "",
+      driverName: "",
+      driverPhone: "",
+      packagingNote: "" 
+  });
+
+  // 🟢 NEW STATE: For Printable Document
+  const [printOrder, setPrintOrder] = useState(null); // Stores order data for printing
 
   useEffect(() => {
     fetchData();
@@ -61,17 +72,21 @@ export default function LogisticsPage() {
     return canFulfill;
   };
 
-  // Open Modal
   const openDispatchModal = (orderId) => {
     setActiveDispatchId(orderId);
-    setLogisticsForm({ vehicleNo: "", trackingId: "" }); 
+    setLogisticsForm({ 
+        vehicleNo: "", 
+        trackingId: "", 
+        driverName: "", 
+        driverPhone: "", 
+        packagingNote: "" 
+    }); 
     setShowDispatchModal(true);
   };
 
-  // Submit Dispatch
   const handleConfirmDispatch = async () => {
-    if (!logisticsForm.vehicleNo || !logisticsForm.trackingId) {
-      alert("Please enter Vehicle Number and Tracking/AWB ID.");
+    if (!logisticsForm.vehicleNo || !logisticsForm.driverName) {
+      alert("Please enter Vehicle Number and Driver Name.");
       return;
     }
 
@@ -82,13 +97,158 @@ export default function LogisticsPage() {
         orderId: activeDispatchId,
         transportDetails: logisticsForm 
       });
-      alert("✅ Order Dispatched Successfully!");
+      
+      // 🟢 1. FIND THE ORDER WE JUST DISPATCHED TO SHOW ON PRINT
+      // We grab the full order object from our existing 'orders' state
+      const dispatchedOrder = orders.find(o => o.orderId === activeDispatchId);
+      
+      // Combine it with the new logistics details for the print view
+      const completeOrderData = {
+          ...dispatchedOrder,
+          transportDetails: { ...logisticsForm, dispatchedAt: new Date() }
+      };
+
+      setPrintOrder(completeOrderData); // Trigger Print View
       setShowDispatchModal(false);
-      fetchData();
+      fetchData(); // Refresh list in background
+
     } catch (e) {
       alert("Error: " + (e.response?.data?.msg || e.message));
     }
   };
+
+  // 🟢 IF PRINT MODE IS ACTIVE, SHOW ONLY THE DOCUMENT
+  if (printOrder) {
+      return (
+        <div className="min-h-screen bg-slate-100 p-8 print:p-0 print:bg-white flex justify-center">
+            <div className="w-full max-w-[210mm] bg-white shadow-2xl print:shadow-none print:w-full">
+                
+                {/* Print Toolbar (Hidden when printing) */}
+                <div className="p-4 bg-slate-800 text-white flex justify-between items-center print:hidden rounded-t-lg">
+                    <button onClick={() => setPrintOrder(null)} className="flex items-center gap-2 hover:text-slate-300 font-bold text-sm">
+                        <FiArrowLeft /> Back to List
+                    </button>
+                    <div className="flex gap-3">
+                        <span className="text-sm font-medium opacity-70 flex items-center gap-2 mr-4">
+                            <FiCheckCircle className="text-green-400"/> Dispatch Confirmed
+                        </span>
+                        <button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-bold flex items-center gap-2 text-sm transition-colors">
+                            <FiPrinter /> Print Challan
+                        </button>
+                    </div>
+                </div>
+
+                {/* 📄 THE DOCUMENT (A4 Layout) */}
+                <div className="p-12 print:p-8 text-slate-900">
+                    {/* Doc Header */}
+                    <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-8">
+                        <div>
+                            <h1 className="text-3xl font-black tracking-tight uppercase">Delivery Challan</h1>
+                            <p className="text-sm font-bold text-slate-500 mt-1">Original for Recipient</p>
+                        </div>
+                        <div className="text-right">
+                            <h2 className="text-xl font-bold">Shivram Hosiery</h2>
+                            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                Plot No 45, Industrial Area,<br/>
+                                Mumbai, Maharashtra - 400001<br/>
+                                GSTIN: 27ABCDE1234F1Z5
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Metadata Grid */}
+                    <div className="grid grid-cols-2 gap-8 mb-8 border border-slate-200 rounded p-4">
+                        <div>
+                            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Dispatch To</h3>
+                            <p className="text-lg font-bold">{printOrder.customerName}</p>
+                            <p className="text-sm text-slate-600">Mumbai, India</p> {/* Replace with real address if avail */}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Challan No</h3>
+                                <p className="font-bold text-slate-800">{printOrder.orderId}</p>
+                            </div>
+                            <div>
+                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Date</h3>
+                                <p className="font-bold text-slate-800">{new Date().toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Vehicle No</h3>
+                                <p className="font-bold text-slate-800 uppercase">{printOrder.transportDetails.vehicleNo}</p>
+                            </div>
+                            <div>
+                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tracking ID</h3>
+                                <p className="font-bold text-slate-800 uppercase">{printOrder.transportDetails.trackingId}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Driver & Packaging Info */}
+                    <div className="mb-8 bg-slate-50 p-4 border border-slate-200 rounded">
+                        <div className="grid grid-cols-2 gap-8">
+                            <div>
+                                <span className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Driver Details</span>
+                                <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                    <FiUser size={14}/> {printOrder.transportDetails.driverName}
+                                </p>
+                                <p className="text-xs text-slate-600 mt-1 flex items-center gap-2">
+                                    <FiPhone size={12}/> {printOrder.transportDetails.driverPhone || "N/A"}
+                                </p>
+                            </div>
+                            <div>
+                                <span className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Packaging Note</span>
+                                <p className="text-sm font-medium text-slate-800 whitespace-pre-line">
+                                    {printOrder.transportDetails.packagingNote || "Standard Packaging"}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Item Table */}
+                    <table className="w-full text-left mb-12 border-collapse">
+                        <thead>
+                            <tr className="border-b-2 border-slate-800">
+                                <th className="py-2 text-xs font-bold text-slate-500 uppercase w-12">#</th>
+                                <th className="py-2 text-xs font-bold text-slate-500 uppercase">Item Description</th>
+                                <th className="py-2 text-xs font-bold text-slate-500 uppercase text-right">Quantity</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {printOrder.items.map((item, index) => (
+                                <tr key={index}>
+                                    <td className="py-3 text-sm text-slate-500">{index + 1}</td>
+                                    <td className="py-3">
+                                        <p className="font-bold text-slate-900">{item.productName}</p>
+                                        <p className="text-xs text-slate-500">{item.category} • {item.color}</p>
+                                    </td>
+                                    <td className="py-3 text-right font-bold text-slate-900 text-lg">
+                                        {item.qtyOrdered}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    {/* Signature Area */}
+                    <div className="mt-20 grid grid-cols-2 gap-20">
+                        <div>
+                            <div className="border-t border-slate-300 w-full pt-2">
+                                <p className="text-xs font-bold text-slate-900">Received By</p>
+                                <p className="text-[10px] text-slate-500">(Sign & Stamp)</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="border-t border-slate-300 w-full pt-2">
+                                <p className="text-xs font-bold text-slate-900">For Shivram Hosiery</p>
+                                <p className="text-[10px] text-slate-500">Authorized Signatory</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      );
+  }
 
   const filteredOrders = orders.filter(o => 
     o.orderId.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -124,7 +284,6 @@ export default function LogisticsPage() {
                 <tr>
                     <th className="p-4 w-32 border-r border-slate-300">Order Ref</th>
                     <th className="p-4 w-40 border-r border-slate-300">Customer</th>
-                    {/* 🟢 NEW PRIORITY COLUMN */}
                     <th className="p-4 w-24 border-r border-slate-300 text-center">Priority</th>
                     <th className="p-4 border-r border-slate-300">Item Details</th>
                     <th className="p-4 text-right border-r border-slate-300 w-24">Qty Needed</th>
@@ -155,7 +314,7 @@ export default function LogisticsPage() {
                                 </div>
                             </td>
 
-                            {/* 🟢 3. PRIORITY BADGE */}
+                            {/* 3. Priority */}
                             <td className="p-4 align-top border-r border-slate-200 text-center">
                                 <span className={`px-2 py-1 rounded-full text-[10px] uppercase font-bold flex items-center justify-center gap-1 w-fit mx-auto ${
                                     order.priority === 'High' ? 'bg-red-100 text-red-700' :
@@ -241,7 +400,7 @@ export default function LogisticsPage() {
       {/* DISPATCH POPUP MODAL */}
       {showDispatchModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-100">
+            <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
                 
                 <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                     <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
@@ -252,48 +411,83 @@ export default function LogisticsPage() {
                     </button>
                 </div>
 
-                <div className="p-6 space-y-4">
+                <div className="p-6 space-y-5 overflow-y-auto">
                     <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-xs text-blue-700 font-medium mb-2">
                         Dispatching Order: <span className="font-bold font-mono">{activeDispatchId}</span>
                     </div>
 
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vehicle Number</label>
-                        <input 
-                            type="text" 
-                            className="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="e.g. MH-04-AB-1234"
-                            value={logisticsForm.vehicleNo}
-                            onChange={(e) => setLogisticsForm({...logisticsForm, vehicleNo: e.target.value})}
-                            autoFocus
-                        />
+                    <div className="space-y-4">
+                        <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            <FiTruck /> Transport Details
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Vehicle Number</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full p-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="MH-04-AB-1234"
+                                    value={logisticsForm.vehicleNo}
+                                    onChange={(e) => setLogisticsForm({...logisticsForm, vehicleNo: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tracking ID</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full p-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="TRK-998877"
+                                    value={logisticsForm.trackingId}
+                                    onChange={(e) => setLogisticsForm({...logisticsForm, trackingId: e.target.value})}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            <FiUser /> Driver Information
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Driver Name</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full p-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Ramesh Kumar"
+                                    value={logisticsForm.driverName}
+                                    onChange={(e) => setLogisticsForm({...logisticsForm, driverName: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Driver Phone</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full p-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="+91 98765 43210"
+                                    value={logisticsForm.driverPhone}
+                                    onChange={(e) => setLogisticsForm({...logisticsForm, driverPhone: e.target.value})}
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tracking / AWB ID</label>
-                        <input 
-                            type="text" 
-                            className="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="e.g. TRK-998877"
-                            value={logisticsForm.trackingId}
-                            onChange={(e) => setLogisticsForm({...logisticsForm, trackingId: e.target.value})}
-                        />
+                        <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                            <FiBox /> Packaging List (Manual Entry)
+                        </h4>
+                        <textarea 
+                            className="w-full p-3 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24"
+                            placeholder="e.g. 3 Bundles (15 pcs each) + 5 Loose pieces. Total 50."
+                            value={logisticsForm.packagingNote}
+                            onChange={(e) => setLogisticsForm({...logisticsForm, packagingNote: e.target.value})}
+                        ></textarea>
                     </div>
                 </div>
 
                 <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                    <button 
-                        onClick={() => setShowDispatchModal(false)} 
-                        className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-xl text-sm"
-                    >
-                        Cancel
-                    </button>
-                    <button 
-                        onClick={handleConfirmDispatch} 
-                        className="px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 flex items-center gap-2 text-sm"
-                    >
-                        <FiSave /> Confirm & Dispatch
-                    </button>
+                    <button onClick={() => setShowDispatchModal(false)} className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-xl text-sm">Cancel</button>
+                    <button onClick={handleConfirmDispatch} className="px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 flex items-center gap-2 text-sm"><FiSave /> Confirm & Dispatch</button>
                 </div>
             </div>
         </div>
