@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
-import { FiPlus, FiBox, FiLayers, FiX, FiClipboard, FiEdit3, FiPackage, FiCalendar, FiActivity, FiRefreshCw } from "react-icons/fi"; 
+import { FiPlus, FiBox, FiLayers, FiX, FiClipboard, FiEdit3, FiPackage, FiCalendar, FiActivity, FiRefreshCw, FiSearch } from "react-icons/fi"; 
 import AddMaterialModal from "./AddMaterialModal";
 import ProductForm from "@/components/ProductForm";
 import ViewRecipeModal from "./ViewRecipeModal";
@@ -20,6 +20,7 @@ export default function InventoryPage() {
   const [products, setProducts] = useState([]);
   const [filterType, setFilterType] = useState("ALL");
   const [filterHealth, setFilterHealth] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState(""); // 🟢 Added search state
 
   useEffect(() => { fetchStock(); }, []);
 
@@ -78,10 +79,22 @@ export default function InventoryPage() {
         };
     });
 
+    // 🟢 Apply Filters
     if (filterType !== 'ALL') combined = combined.filter(i => (filterType === 'RM' ? i.type === 'Raw Material' : i.type === 'Finished Good'));
     if (filterHealth !== 'ALL') combined = combined.filter(i => i.status === filterHealth);
+    
+    // 🟢 Apply Search Filter
+    if (searchQuery.trim() !== "") {
+        const query = searchQuery.toLowerCase();
+        combined = combined.filter(i => 
+            i.name.toLowerCase().includes(query) || 
+            i.idDisplay.toLowerCase().includes(query) ||
+            i.type.toLowerCase().includes(query)
+        );
+    }
+
     return combined;
-  }, [rawMaterials, products, filterType, filterHealth]);
+  }, [rawMaterials, products, filterType, filterHealth, searchQuery]);
 
   const getStatusBadge = (status) => { 
     const s = status ? status.toUpperCase() : "UNKNOWN";
@@ -124,15 +137,33 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-end gap-6">
-        <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Item Type</label>
-            <div className="flex bg-white rounded-lg border border-slate-300 overflow-hidden w-fit">
-                <button onClick={() => setFilterType('ALL')} className={`px-5 py-2.5 text-sm font-bold border-r ${filterType === 'ALL' ? 'bg-slate-800 text-white' : 'hover:bg-slate-50'}`}>All</button>
-                <button onClick={() => setFilterType('RM')} className={`px-5 py-2.5 text-sm font-bold border-r ${filterType === 'RM' ? 'bg-slate-800 text-white' : 'hover:bg-slate-50'}`}>Raw</button>
-                <button onClick={() => setFilterType('FG')} className={`px-5 py-2.5 text-sm font-bold ${filterType === 'FG' ? 'bg-slate-800 text-white' : 'hover:bg-slate-50'}`}>FG</button>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-end gap-6">
+        <div className="flex flex-col md:flex-row gap-6 w-full lg:w-auto">
+            {/* 🟢 Search Filter UI */}
+            <div className="w-full md:w-64">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Search Item</label>
+                <div className="relative">
+                    <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input 
+                        type="text"
+                        placeholder="Name, SKU or ID..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-200 outline-none transition-all"
+                    />
+                </div>
+            </div>
+
+            <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Item Type</label>
+                <div className="flex bg-white rounded-lg border border-slate-300 overflow-hidden w-fit">
+                    <button onClick={() => setFilterType('ALL')} className={`px-5 py-2.5 text-sm font-bold border-r ${filterType === 'ALL' ? 'bg-slate-800 text-white' : 'hover:bg-slate-50'}`}>All</button>
+                    <button onClick={() => setFilterType('RM')} className={`px-5 py-2.5 text-sm font-bold border-r ${filterType === 'RM' ? 'bg-slate-800 text-white' : 'hover:bg-slate-50'}`}>Raw</button>
+                    <button onClick={() => setFilterType('FG')} className={`px-5 py-2.5 text-sm font-bold ${filterType === 'FG' ? 'bg-slate-800 text-white' : 'hover:bg-slate-50'}`}>FG</button>
+                </div>
             </div>
         </div>
+
         <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Health Status</label>
             <div className="flex rounded-lg overflow-hidden w-fit shadow-sm">
@@ -200,7 +231,7 @@ export default function InventoryPage() {
                     {Number(item.stockAtLeast).toFixed(2)}
                   </td>
                   
-                  {/* 🟢 Health % (STRICT COLOR CODING: Red 0-33, Yellow 33-66, Green 66-100, Purple >100) */}
+                  {/* Health % */}
                   <td className="px-6 py-4 bg-slate-50/50">
                      <div className="w-full">
                         <div className="flex justify-between items-end mb-1">
@@ -233,7 +264,7 @@ export default function InventoryPage() {
             ))}
           </tbody>
         </table>
-        {unifiedData.length === 0 && !loading && <div className="p-12 text-center text-slate-400 font-medium">Inventory is empty.</div>}
+        {unifiedData.length === 0 && !loading && <div className="p-12 text-center text-slate-400 font-medium">Inventory is empty or no items match your search.</div>}
       </div>
 
       {modalMode === 'SELECTION' && (
