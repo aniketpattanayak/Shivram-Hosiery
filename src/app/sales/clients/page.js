@@ -5,7 +5,7 @@ import AuthGuard from '@/components/AuthGuard';
 import api from "@/utils/api";
 import {
   FiUser, FiMapPin, FiCreditCard, FiSave, FiSearch,
-  FiPlus, FiActivity, FiX, FiBriefcase
+  FiPlus, FiActivity, FiX, FiBriefcase, FiEdit3
 } from "react-icons/fi";
 import Link from "next/link";
 
@@ -77,11 +77,15 @@ export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClient, setSelectedClient] = useState(null);
 
+  // 🟢 Edit Mode State
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
   const [formData, setFormData] = useState({
     name: "", gstNumber: "", address: "", billToAddress: "",
     contactPerson: "", contactNumber: "", email: "",
     paymentTerms: "30 Days", 
-    salesPerson: "" // Will be auto-set
+    salesPerson: "" 
   });
 
   useEffect(() => {
@@ -118,16 +122,50 @@ export default function ClientsPage() {
     return quotes.some(q => String(q.clientId || q.client) === String(clientId));
   };
 
+  // 🟢 START EDIT FUNCTION
+  const startEdit = (client) => {
+    setFormData({
+        name: client.name || "", 
+        gstNumber: client.gstNumber || "", 
+        address: client.address || "", 
+        billToAddress: client.billToAddress || "",
+        contactPerson: client.contactPerson || "", 
+        contactNumber: client.contactNumber || "", 
+        email: client.email || "",
+        paymentTerms: client.paymentTerms || "30 Days", 
+        salesPerson: client.salesPerson || ""
+    });
+    setIsEditMode(true);
+    setEditingId(client._id);
+    setView("add");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post("/sales/clients", formData);
-      alert("✅ Customer Added!");
+      if (isEditMode) {
+          // 🟢 UPDATE EXISTING (Backend will block if not Admin)
+          await api.put(`/sales/clients/${editingId}`, formData);
+          alert("✅ Client Details Updated!");
+      } else {
+          // CREATE NEW
+          await api.post("/sales/clients", formData);
+          alert("✅ Customer Added!");
+      }
+
       setView("list");
       fetchData();
-      
-      // Reset Form (But keep salesPerson if not admin)
+      resetForm();
+    } catch (error) {
+      alert("Error saving: " + (error.response?.data?.msg || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🟢 RESET FORM FUNCTION
+  const resetForm = () => {
       const defaultSalesPerson = (currentUser?.role === 'Admin' || currentUser?.role === 'Manager') ? "" : currentUser?.name;
       setFormData({ 
           name: "", gstNumber: "", address: "", billToAddress: "", 
@@ -135,11 +173,8 @@ export default function ClientsPage() {
           paymentTerms: "30 Days", 
           salesPerson: defaultSalesPerson 
       });
-    } catch (error) {
-      alert("Error adding customer: " + (error.response?.data?.msg || error.message));
-    } finally {
-      setLoading(false);
-    }
+      setIsEditMode(false);
+      setEditingId(null);
   };
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -149,9 +184,6 @@ export default function ClientsPage() {
       c.gstNumber?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 
-  // 🟢 LOGIC: Is the Sales Person Field Locked?
-  // Locked for everyone EXCEPT Admin and Manager
   const isSalesPersonLocked = currentUser && (currentUser.role !== 'Admin' && currentUser.role !== 'Manager');
 
   return (
@@ -165,7 +197,7 @@ export default function ClientsPage() {
             <p className="text-slate-500 text-sm">Manage customer details and statuses.</p>
         </div>
         {view === "list" && (
-          <button onClick={() => setView("add")} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-lg shadow-blue-200">
+          <button onClick={() => { resetForm(); setView("add"); }} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-lg shadow-blue-200">
             <FiPlus /> Add Leads
           </button>
         )}
@@ -194,7 +226,19 @@ export default function ClientsPage() {
                   const clientHasQuote = hasQuote(client._id);
                   return (
                     <tr key={client._id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-4 font-bold text-slate-800">{client.name}</td>
+                        <td className="p-4 font-bold text-slate-800">
+                            {client.name}
+                            {/* 🟢 EDIT ICON: ONLY VISIBLE TO ADMIN */}
+                            {currentUser?.role === 'Admin' && (
+                                <button 
+                                    onClick={() => startEdit(client)} 
+                                    className="ml-2 text-slate-300 hover:text-blue-600 transition-colors"
+                                    title="Edit Master Details (Admin Only)"
+                                >
+                                    <FiEdit3 size={16} />
+                                </button>
+                            )}
+                        </td>
                         <td className="p-4">
                             <div className="text-slate-900 font-medium">{client.contactPerson}</div>
                             <div className="text-xs text-slate-500">{client.contactNumber}</div>
@@ -241,19 +285,22 @@ export default function ClientsPage() {
             
             {/* Company Info */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><FiUser className="text-blue-500" /> Company Details</h3>
+                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <FiUser className="text-blue-500" /> 
+                    {isEditMode ? "Edit Company Details" : "Company Details"}
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="col-span-2">
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Company Name</label>
-                        <input type="text" name="name" required onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-100 outline-none" placeholder="e.g. Tata Steel Ltd" />
+                        <input type="text" name="name" value={formData.name} required onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-100 outline-none" placeholder="e.g. Tata Steel Ltd" />
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">GST Number</label>
-                        <input type="text" name="gstNumber" onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none" />
+                        <input type="text" name="gstNumber" value={formData.gstNumber} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none" />
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
-                        <input type="email" name="email" onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none" />
+                        <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none" />
                     </div>
                 </div>
             </div>
@@ -264,11 +311,11 @@ export default function ClientsPage() {
                 <div className="grid grid-cols-1 gap-4">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Billing Address</label>
-                        <textarea name="billToAddress" required onChange={handleChange} rows="2" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"></textarea>
+                        <textarea name="billToAddress" value={formData.billToAddress} required onChange={handleChange} rows="2" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"></textarea>
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Shipping Address</label>
-                        <textarea name="address" onChange={handleChange} rows="2" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"></textarea>
+                        <textarea name="address" value={formData.address} onChange={handleChange} rows="2" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"></textarea>
                     </div>
                 </div>
             </div>
@@ -279,27 +326,25 @@ export default function ClientsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contact Person</label>
-                        <input type="text" name="contactPerson" onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none" />
+                        <input type="text" name="contactPerson" value={formData.contactPerson} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none" />
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Phone</label>
-                        <input type="text" name="contactNumber" onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none" />
+                        <input type="text" name="contactNumber" value={formData.contactNumber} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none" />
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Payment Terms</label>
-                        <select name="paymentTerms" onChange={handleChange} defaultValue="30 Days" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none">
+                        <select name="paymentTerms" value={formData.paymentTerms} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none">
                             <option value="Advance">Advance</option><option value="15 Days">15 Days</option><option value="30 Days">30 Days</option><option value="45 Days">45 Days</option><option value="60 Days">60 Days</option>
                         </select>
                     </div>
 
-                    {/* 🟢 SALES PERSON ASSIGNMENT LOGIC */}
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
                             <FiBriefcase /> Assigned Sales Rep
                         </label>
                         
                         {isSalesPersonLocked ? (
-                            // LOCKED INPUT (For Sales Reps: They see their own name)
                             <div className="relative">
                                 <input 
                                     type="text" 
@@ -310,7 +355,6 @@ export default function ClientsPage() {
                                 <span className="absolute right-3 top-3 text-[10px] text-slate-400 font-bold uppercase">Locked</span>
                             </div>
                         ) : (
-                            // UNLOCKED DROPDOWN (For Admin/Manager: They can assign anyone)
                             <select 
                                 name="salesPerson" 
                                 value={formData.salesPerson} 
@@ -329,8 +373,10 @@ export default function ClientsPage() {
             </div>
 
             <div className="flex gap-4">
-                <button type="button" onClick={() => setView("list")} className="flex-1 py-4 bg-white text-slate-600 font-bold rounded-xl border border-slate-200 hover:bg-slate-50">Cancel</button>
-                <button type="submit" disabled={loading} className="flex-1 py-4 bg-slate-900 text-white font-bold rounded-xl shadow-lg hover:bg-black flex justify-center items-center gap-2">{loading ? "Saving..." : <><FiSave /> Save Customer</>}</button>
+                <button type="button" onClick={() => { setView("list"); resetForm(); }} className="flex-1 py-4 bg-white text-slate-600 font-bold rounded-xl border border-slate-200 hover:bg-slate-50">Cancel</button>
+                <button type="submit" disabled={loading} className="flex-1 py-4 bg-slate-900 text-white font-bold rounded-xl shadow-lg hover:bg-black flex justify-center items-center gap-2">
+                    {loading ? "Saving..." : <><FiSave /> {isEditMode ? "Update Customer" : "Save Customer"}</>}
+                </button>
             </div>
           </form>
         </div>
