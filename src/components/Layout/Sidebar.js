@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  FiLogOut, FiChevronDown, FiChevronRight, FiShield, FiAlertTriangle
+  FiLogOut, FiChevronDown, FiChevronRight, FiShield, FiAlertTriangle, FiPackage
 } from "react-icons/fi";
 import { SYSTEM_MODULES } from "@/utils/navigationConfig";
 import api from "@/utils/api"; 
@@ -64,15 +64,9 @@ export default function Sidebar() {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
   };
 
-  // 🟢 FIX: Precise Highlighting Logic
   const isActive = (href) => {
-    // Exact match
     if (pathname === href) return true;
-    
-    // Prevent "/qc" from matching "/qc-review"
-    // We ensure that if we are matching a sub-path, it must have a slash after it.
     if (pathname.startsWith(`${href}/`)) return true;
-    
     return false;
   };
 
@@ -93,13 +87,33 @@ export default function Sidebar() {
         {/* 1. STANDARD MODULES */}
         {SYSTEM_MODULES.map((item, index) => {
           if (item.groupName) {
+            
+            // Filter standard items based on access
             const childItemsWithAccess = item.items.filter(sub => {
                 const childKey = sub.key || sub.href.replace('/', '').replace('/', '_'); 
                 return hasAccess(childKey);
             });
+
+            // 🟢 AUTOMATICALLY ADD KITTING LINK HERE
+            // This ensures it shows up even if you didn't edit navigationConfig.js
+            if (item.groupName === 'Manufacturing' && (user?.role === 'Admin' || hasAccess('production'))) {
+                const kittingHref = "/kitting"; // The new URL
+                const alreadyExists = childItemsWithAccess.some(i => i.href === kittingHref);
+                
+                if (!alreadyExists) {
+                    childItemsWithAccess.push({
+                        name: "Full Kitting",
+                        href: kittingHref,
+                        icon: FiPackage
+                    });
+                }
+            }
+
             if (childItemsWithAccess.length === 0) return null;
+            
             const isOpen = expandedGroups[item.groupName];
-            const isGroupActive = item.items.some(sub => isActive(sub.href));
+            // Check if any child is active to highlight the group
+            const isGroupActive = childItemsWithAccess.some(sub => isActive(sub.href));
 
             return (
               <div key={index} className="mb-2">
@@ -119,8 +133,10 @@ export default function Sidebar() {
               </div>
             );
           }
+          
           const itemKey = item.key || item.href.replace('/', '').replace('/', '_');
           if (!hasAccess(itemKey)) return null; 
+          
           return (
             <Link key={index} href={item.href} className={`flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 group mb-2 ${isActive(item.href) ? "bg-blue-50 text-blue-700 shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
               <item.icon className={`w-5 h-5 mr-3 transition-colors ${isActive(item.href) ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} />{item.name}
@@ -128,12 +144,12 @@ export default function Sidebar() {
           );
         })}
 
-        {/* 2. SEPARATOR FOR ADMIN */}
+        {/* SEPARATOR FOR ADMIN */}
         {user?.role === "Admin" && (
             <div className="my-4 border-t border-slate-100 mx-2"></div>
         )}
 
-        {/* 🟢 3. QC REVIEW (UPDATED LINK) */}
+        {/* QC REVIEW (Admin Only) */}
         {user?.role === "Admin" && (
           <Link
             href="/qc-review" 
@@ -145,7 +161,7 @@ export default function Sidebar() {
           </Link>
         )}
 
-        {/* 4. SETTINGS */}
+        {/* SETTINGS */}
         {user?.role === "Admin" && (
             <Link
             href="/settings"

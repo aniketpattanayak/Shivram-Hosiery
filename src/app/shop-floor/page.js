@@ -3,13 +3,13 @@ import { useState, useEffect } from "react";
 import api from "@/utils/api";
 import AuthGuard from '@/components/AuthGuard';
 import {
-  FiBox, FiScissors, FiLayers, FiPackage, FiCheckCircle, 
-  FiArrowRight, FiClock, FiSearch, FiFilter, FiX, FiActivity, 
+  FiScissors, FiLayers, FiPackage, FiCheckCircle, 
+  FiArrowRight, FiClock, FiSearch, FiX, 
   FiMapPin, FiAlertTriangle, FiUser, FiChevronsRight, FiList, FiCheckSquare
 } from "react-icons/fi";
 
+// 🟢 WORKFLOW: Starts directly at Cutting (Material/Kitting is hidden)
 const WORKFLOW_STEPS = [
-    { id: "Material_Pending", label: "Material", icon: FiBox, color: "blue", routeKey: "cutting" },
     { id: "Cutting_Started", label: "Cutting", icon: FiScissors, color: "amber", routeKey: "cutting" },
     { id: "Sewing_Started", label: "Stitching", icon: FiLayers, color: "indigo", routeKey: "stitching" },
     { id: "Packaging_Started", label: "Packing", icon: FiPackage, color: "purple", routeKey: "packaging" },
@@ -22,9 +22,8 @@ export default function ShopFloorPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStage, setFilterStage] = useState("ALL");
   
-  // 🟢 Stores the "Just Issued" picking list from backend response
+  // Stores picking list feedback (History)
   const [pickingFeedback, setPickingFeedback] = useState({}); 
-  
   const [selectedJob, setSelectedJob] = useState(null);
 
   const [confirmDialog, setConfirmDialog] = useState({
@@ -42,34 +41,6 @@ export default function ShopFloorPage() {
       setJobs(res.data);
       setLoading(false);
     } catch (e) { console.error(e); }
-  };
-
-  // --- ACTIONS ---
-  const triggerIssueMaterial = (jobId) => {
-    const job = jobs.find((j) => j.jobId === jobId);
-    const route = job.routing?.cutting;
-    const isJobWork = route?.type === "Job Work";
-    
-    setConfirmDialog({
-        isOpen: true,
-        title: "Issue Material",
-        message: isJobWork 
-            ? `Issue fabric to Vendor: "${route.vendorName}" for Job Work?` 
-            : "Issue fabric for In-House cutting?",
-        onConfirm: async () => {
-            try {
-                const res = await api.post("/shopfloor/issue", { jobId });
-                
-                // 🟢 CAPTURE PICKING LIST
-                if (res.data.pickingList) {
-                    setPickingFeedback(prev => ({ ...prev, [jobId]: res.data.pickingList }));
-                }
-                
-                fetchData();
-            } catch (e) { alert("Error: " + e.message); }
-            setConfirmDialog({ isOpen: false });
-        }
-    });
   };
 
   const triggerAdvanceStage = (jobId, nextStage, label) => {
@@ -90,20 +61,34 @@ export default function ShopFloorPage() {
   const getStepStatus = (currentStepId, stepId) => {
     const currentIndex = WORKFLOW_STEPS.findIndex(s => s.id === currentStepId);
     const stepIndex = WORKFLOW_STEPS.findIndex(s => s.id === stepId);
+    
+    // 🟢 FIX: Handle 'Cutting_Pending' correctly (It's the "Ready to Start" state)
+    if (currentStepId === 'Cutting_Pending') {
+         if (stepIndex === 0) return 'active'; // Highlight Cutting bubble
+         return 'pending';
+    }
+
     if (stepIndex < currentIndex) return 'completed';
     if (stepIndex === currentIndex) return 'active';
     return 'pending';
   };
 
+  // 🟢 FIX: Explicitly handle the "Start Cutting" label
   const getNextStepLabel = (currentStepId) => {
+    if (currentStepId === 'Cutting_Pending') return "Start Cutting";
+
     const currentIndex = WORKFLOW_STEPS.findIndex(s => s.id === currentStepId);
+    // If not found or last step, return Finish
     if (currentIndex === -1 || currentIndex === WORKFLOW_STEPS.length - 1) return "Finish";
+    
     return WORKFLOW_STEPS[currentIndex + 1].label;
   };
 
   const getActionConfig = (currentStep, jobId) => {
       switch(currentStep) {
-          case 'Material_Pending': return { text: "Issue Fabric", action: () => triggerIssueMaterial(jobId), color: "bg-slate-900" };
+          // 🟢 ACTION: Start Cutting
+          case 'Cutting_Pending': return { text: "Start Cutting", action: () => triggerAdvanceStage(jobId, 'Cutting_Started', 'Preparation'), color: "bg-blue-600" };
+          
           case 'Cutting_Started': return { text: "Cutting Done", action: () => triggerAdvanceStage(jobId, 'Sewing_Started', 'Cutting'), color: "bg-amber-600" };
           case 'Sewing_Started': return { text: "Stitching Done", action: () => triggerAdvanceStage(jobId, 'Packaging_Started', 'Stitching'), color: "bg-blue-600" };
           case 'Packaging_Started': return { text: "Packing Done", action: () => triggerAdvanceStage(jobId, 'QC_Pending', 'Packing'), color: "bg-purple-600" };
@@ -170,13 +155,7 @@ export default function ShopFloorPage() {
                 {filteredJobs.map((job) => {
                     const action = getActionConfig(job.currentStep, job.jobId);
                     
-                    // 🟢 PRIORITY 1: Immediate Feedback (Just clicked Issue)
-                    const feedback = pickingFeedback[job.jobId];
-                    
-                    // 🟢 PRIORITY 2: Saved History (Page Reloaded)
-                    // If no immediate feedback, check if job has recorded issued materials
-                    const hasHistory = !feedback && job.issuedMaterials && job.issuedMaterials.length > 0;
-
+                    const hasHistory = job.issuedMaterials && job.issuedMaterials.length > 0;
                     const nextStepLabel = getNextStepLabel(job.currentStep);
 
                     let currentLocation = "Store";
@@ -244,7 +223,7 @@ export default function ShopFloorPage() {
                                 </div>
                             </td>
 
-                            {/* 4. Action & Picking List */}
+                            {/* 4. Action & History */}
                             <td className="p-4 text-right align-top w-80">
                                 {action ? (
                                     <button onClick={action.action} className={`px-4 py-2 text-white text-[11px] font-black rounded-lg shadow-sm active:scale-95 transition-all ${action.color} mb-2`}>
@@ -252,42 +231,11 @@ export default function ShopFloorPage() {
                                     </button>
                                 ) : <span className="text-xs italic text-slate-300">In Process</span>}
 
-                                {/* 🟢 1. DISPLAY IMMEDIATE FEEDBACK (If available) */}
-                                {feedback && Array.isArray(feedback) && (
-                                    <div className="text-left mt-2 bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-[10px] shadow-sm animate-in slide-in-from-top-1">
-                                        <div className="font-bold text-emerald-800 mb-2 flex items-center gap-1 border-b border-emerald-200 pb-1">
-                                            <FiList size={10} /> PICKING LIST
-                                        </div>
-                                        <div className="space-y-3">
-                                            {feedback.map((item, idx) => (
-                                                <div key={idx}>
-                                                    <div className="flex justify-between font-bold text-slate-700 mb-0.5">
-                                                        <span className="flex items-center gap-1"><FiCheckSquare size={10} className="text-emerald-500"/> {item.materialName}</span>
-                                                        <span className="bg-white px-1 rounded border border-slate-200">Qty: {item.totalQty}</span>
-                                                    </div>
-                                                    {item.batches && item.batches.length > 0 ? (
-                                                        <div className="pl-2 space-y-0.5 border-l-2 border-emerald-300 ml-1">
-                                                            {item.batches.map((batch, bIdx) => (
-                                                                <div key={bIdx} className="flex justify-between text-slate-500 font-mono text-[9px] bg-white/50 px-1 rounded">
-                                                                    <span>↳ Lot {batch.lotNumber}</span>
-                                                                    <span className="font-bold text-emerald-600">{batch.qty}</span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-amber-500 italic pl-4 text-[9px]">Check Stock (Auto)</div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 🟢 2. DISPLAY SAVED HISTORY (If no immediate feedback) */}
+                                {/* DISPLAY SAVED HISTORY (From Kitting) */}
                                 {hasHistory && (
                                     <div className="text-left mt-2 bg-slate-50 border border-slate-200 rounded-lg p-3 text-[10px] shadow-sm">
                                         <div className="font-bold text-slate-600 mb-2 flex items-center gap-1 border-b border-slate-200 pb-1">
-                                            <FiCheckCircle size={10} /> ISSUED MATERIAL
+                                            <FiCheckCircle size={10} /> ISSUED MATERIAL (History)
                                         </div>
                                         <div className="space-y-1">
                                             {job.issuedMaterials.map((item, idx) => (
@@ -309,7 +257,7 @@ export default function ShopFloorPage() {
         </table>
       </div>
 
-      {/* CONFIRMATION DIALOG & MODALS (Kept same as before) */}
+      {/* CONFIRMATION DIALOG */}
       {confirmDialog.isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden p-8 text-center animate-in zoom-in-95">
