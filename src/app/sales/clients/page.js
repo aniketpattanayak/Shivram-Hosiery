@@ -5,11 +5,65 @@ import AuthGuard from '@/components/AuthGuard';
 import api from "@/utils/api";
 import {
   FiUser, FiMapPin, FiCreditCard, FiSave, FiSearch,
-  FiPlus, FiActivity, FiX, FiBriefcase, FiEdit3
+  FiPlus, FiActivity, FiX, FiBriefcase, FiEdit3, FiClock
 } from "react-icons/fi";
 import Link from "next/link";
 
-// --- ACTIVITY MODAL (Unchanged) ---
+// 🟢 NEW: HISTORY MODAL COMPONENT
+const HistoryModal = ({ isOpen, onClose, client }) => {
+  if (!isOpen || !client) return null;
+
+  // Sort history: Newest first
+  const history = client.activityLog?.sort((a, b) => new Date(b.date) - new Date(a.date)) || [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[80vh]">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <div>
+              <h3 className="font-bold text-slate-800">Activity History</h3>
+              <p className="text-xs text-slate-500">{client.name}</p>
+            </div>
+            <button onClick={onClose}><FiX size={20} className="text-slate-400 hover:text-red-500"/></button>
+        </div>
+        
+        <div className="p-6 overflow-y-auto space-y-6">
+          {history.length === 0 ? (
+            <div className="text-center text-slate-400 text-sm">No history found.</div>
+          ) : (
+            history.map((log, idx) => (
+              <div key={idx} className="relative pl-6 border-l-2 border-slate-100 last:border-0 pb-1">
+                {/* Timeline Dot */}
+                <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-blue-100 border-2 border-blue-500"></div>
+                
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">{log.status}</span>
+                    <p className="text-sm font-medium text-slate-800 mt-1">"{log.remark}"</p>
+                    <div className="flex items-center gap-2 mt-2">
+                        <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded flex items-center gap-1">
+                           <FiUser size={10} /> {log.updatedBy || 'Unknown'}
+                        </span>
+                        <span className="text-[10px] font-bold bg-amber-50 text-amber-600 px-2 py-0.5 rounded uppercase">
+                           {log.type}
+                        </span>
+                    </div>
+                  </div>
+                  <div className="text-[10px] font-bold text-slate-400 text-right">
+                    {new Date(log.date).toLocaleDateString()}<br/>
+                    {new Date(log.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- UPDATE STATUS MODAL (Unchanged) ---
 const ActivityModal = ({ isOpen, onClose, client, onSuccess }) => {
   const [formData, setFormData] = useState({ type: 'Call', status: '', remark: '' });
 
@@ -22,9 +76,9 @@ const ActivityModal = ({ isOpen, onClose, client, onSuccess }) => {
     try {
       await api.put(`/sales/clients/${client._id}`, {
         status: formData.status,
-        lastActivity: { type: formData.type, remark: formData.remark, date: new Date() }
+        lastActivity: { type: formData.type, remark: formData.remark }
       });
-      alert(`✅ Status Updated to: ${formData.status}`);
+      alert(`✅ Status Updated`);
       onSuccess();
       onClose();
     } catch (error) { console.error(error); alert("Error updating client activity."); }
@@ -76,6 +130,9 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClient, setSelectedClient] = useState(null);
+  
+  // 🟢 NEW STATE FOR HISTORY MODAL
+  const [historyClient, setHistoryClient] = useState(null);
 
   // 🟢 Edit Mode State
   const [isEditMode, setIsEditMode] = useState(false);
@@ -244,13 +301,19 @@ export default function ClientsPage() {
                             <div className="text-xs text-slate-500">{client.contactNumber}</div>
                         </td>
                         <td className="p-4">
-                            <span className={`px-2 py-1 text-xs font-bold rounded border ${
-                                client.status === 'Customer' ? 'bg-purple-100 text-purple-700 border-purple-200' :
-                                client.status === 'Order Won' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
-                                'bg-blue-50 text-blue-700 border-blue-200'
-                            }`}>
-                                {client.status || 'Active'}
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className={`px-2 py-1 text-xs font-bold rounded border ${
+                                    client.status === 'Customer' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                                    client.status === 'Order Won' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
+                                    'bg-blue-50 text-blue-700 border-blue-200'
+                                }`}>
+                                    {client.status || 'Active'}
+                                </span>
+                                {/* 🟢 HISTORY BUTTON */}
+                                <button onClick={() => setHistoryClient(client)} className="text-slate-400 hover:text-slate-800 transition-colors" title="View History">
+                                    <FiClock size={16} />
+                                </button>
+                            </div>
                         </td>
                         
                         {/* Show Sales Person Name */}
@@ -383,6 +446,8 @@ export default function ClientsPage() {
       )}
       
       <ActivityModal isOpen={!!selectedClient} client={selectedClient} onClose={() => setSelectedClient(null)} onSuccess={fetchData} />
+      {/* 🟢 HISTORY MODAL */}
+      <HistoryModal isOpen={!!historyClient} client={historyClient} onClose={() => setHistoryClient(null)} />
     </div>
     </AuthGuard>
   );
