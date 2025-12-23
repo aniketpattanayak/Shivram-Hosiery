@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  FiLogOut, FiChevronDown, FiChevronRight, FiShield
+  FiLogOut, FiChevronDown, FiChevronRight, FiShield, FiAlertTriangle
 } from "react-icons/fi";
 import { SYSTEM_MODULES } from "@/utils/navigationConfig";
 import api from "@/utils/api"; 
@@ -14,36 +14,27 @@ export default function Sidebar() {
   const [user, setUser] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
 
-  // 🟢 1. STRICT SECURITY CHECK (Forced Logout on Change)
   useEffect(() => {
     const checkUserStatus = async () => {
       const stored = localStorage.getItem("userInfo");
       if (!stored) return;
 
       const localUser = JSON.parse(stored);
-      if (!user) setUser(localUser); // Load menu instantly
+      if (!user) setUser(localUser);
 
       try {
-        // Fetch Fresh Data from DB
         const { data: freshUser } = await api.get("/auth/me");
         
-        // Compare Database vs Local Storage
         const roleChanged = freshUser.role !== localUser.role;
         const permsChanged = JSON.stringify(freshUser.permissions) !== JSON.stringify(localUser.permissions);
 
-        // 🚨 KILL SWITCH: If anything changed, force logout
         if (roleChanged || permsChanged) {
-             alert("⚠️ System Notice: Your access permissions have been updated by an Admin.\n\nPlease log in again to refresh your profile.");
-             
-             // Destroy Session
+             alert("⚠️ Permissions Updated. Please log in again.");
              localStorage.removeItem("userInfo");
-             localStorage.removeItem("token"); // Ensure token is cleared too
-             
-             // Force Redirect
+             localStorage.removeItem("token");
              router.push("/login");
         }
       } catch (error) {
-        // If 401 (Unauthorized), user is deleted/blocked
         if (error.response?.status === 401) {
             localStorage.removeItem("userInfo");
             localStorage.removeItem("token");
@@ -51,15 +42,12 @@ export default function Sidebar() {
         }
       }
     };
-
     checkUserStatus();
-  }, [pathname]); // Runs on every page navigation
+  }, [pathname]);
 
-  // 🟢 HELPER: Check Access
   const hasAccess = (moduleKey) => {
     if (!user) return false;
     if (user.role === 'Admin') return true; 
-    
     const userPerms = Array.isArray(user.permissions) ? user.permissions : [];
     return userPerms.includes(moduleKey) || userPerms.includes('all');
   };
@@ -76,10 +64,16 @@ export default function Sidebar() {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
   };
 
+  // 🟢 FIX: Precise Highlighting Logic
   const isActive = (href) => {
+    // Exact match
     if (pathname === href) return true;
-    if (href === '/sales/expenses' && pathname === '/sales/expenses/new') return false; 
-    return pathname.startsWith(`${href}/`);
+    
+    // Prevent "/qc" from matching "/qc-review"
+    // We ensure that if we are matching a sub-path, it must have a slash after it.
+    if (pathname.startsWith(`${href}/`)) return true;
+    
+    return false;
   };
 
   if (pathname === "/login" || pathname === "/register") return null;
@@ -96,45 +90,28 @@ export default function Sidebar() {
 
       <nav className="flex-1 overflow-y-auto py-6 space-y-1 px-3 custom-scrollbar">
         
+        {/* 1. STANDARD MODULES */}
         {SYSTEM_MODULES.map((item, index) => {
-          
           if (item.groupName) {
             const childItemsWithAccess = item.items.filter(sub => {
                 const childKey = sub.key || sub.href.replace('/', '').replace('/', '_'); 
                 return hasAccess(childKey);
             });
-
             if (childItemsWithAccess.length === 0) return null;
-
             const isOpen = expandedGroups[item.groupName];
             const isGroupActive = item.items.some(sub => isActive(sub.href));
 
             return (
               <div key={index} className="mb-2">
-                <button
-                  onClick={() => toggleGroup(item.groupName)}
-                  className={`w-full flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200
-                    ${isGroupActive ? 'text-slate-800 bg-slate-50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
-                  `}
-                >
-                  <div className="flex items-center">
-                    <item.icon className={`w-5 h-5 mr-3 ${isGroupActive ? 'text-blue-600' : 'text-slate-400'}`} />
-                    <span>{item.groupName}</span>
-                  </div>
+                <button onClick={() => toggleGroup(item.groupName)} className={`w-full flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${isGroupActive ? 'text-slate-800 bg-slate-50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
+                  <div className="flex items-center"><item.icon className={`w-5 h-5 mr-3 ${isGroupActive ? 'text-blue-600' : 'text-slate-400'}`} /><span>{item.groupName}</span></div>
                   {isOpen ? <FiChevronDown /> : <FiChevronRight />}
                 </button>
-
                 {isOpen && (
                   <div className="mt-1 ml-4 space-y-1 border-l-2 border-slate-100 pl-2">
                     {childItemsWithAccess.map((subItem, subIndex) => (
-                      <Link
-                        key={subIndex}
-                        href={subItem.href}
-                        className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200
-                          ${isActive(subItem.href) ? "bg-blue-50 text-blue-700 shadow-sm" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}
-                      >
-                         <subItem.icon className={`w-4 h-4 mr-3 transition-colors ${isActive(subItem.href) ? "text-blue-600" : "text-slate-400"}`} />
-                        {subItem.name}
+                      <Link key={subIndex} href={subItem.href} className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${isActive(subItem.href) ? "bg-blue-50 text-blue-700 shadow-sm" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}>
+                         <subItem.icon className={`w-4 h-4 mr-3 transition-colors ${isActive(subItem.href) ? "text-blue-600" : "text-slate-400"}`} />{subItem.name}
                       </Link>
                     ))}
                   </div>
@@ -142,33 +119,44 @@ export default function Sidebar() {
               </div>
             );
           }
-
           const itemKey = item.key || item.href.replace('/', '').replace('/', '_');
           if (!hasAccess(itemKey)) return null; 
-
           return (
-            <Link
-              key={index}
-              href={item.href}
-              className={`flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 group mb-2
-                ${isActive(item.href) ? "bg-blue-50 text-blue-700 shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}
-            >
-              <item.icon className={`w-5 h-5 mr-3 transition-colors ${isActive(item.href) ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} />
-              {item.name}
+            <Link key={index} href={item.href} className={`flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 group mb-2 ${isActive(item.href) ? "bg-blue-50 text-blue-700 shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
+              <item.icon className={`w-5 h-5 mr-3 transition-colors ${isActive(item.href) ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} />{item.name}
             </Link>
           );
         })}
 
+        {/* 2. SEPARATOR FOR ADMIN */}
+        {user?.role === "Admin" && (
+            <div className="my-4 border-t border-slate-100 mx-2"></div>
+        )}
+
+        {/* 🟢 3. QC REVIEW (UPDATED LINK) */}
+        {user?.role === "Admin" && (
+          <Link
+            href="/qc-review" 
+            className={`flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 group mb-2
+              ${isActive('/qc-review') ? "bg-red-50 text-red-600 shadow-sm" : "text-slate-600 hover:bg-red-50 hover:text-red-600"}`}
+          >
+            <FiAlertTriangle className={`w-5 h-5 mr-3 transition-colors ${isActive('/qc-review') ? "text-red-600" : "text-slate-400 group-hover:text-red-600"}`} />
+            QC Review (Admin)
+          </Link>
+        )}
+
+        {/* 4. SETTINGS */}
         {user?.role === "Admin" && (
             <Link
             href="/settings"
-            className={`flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 group mb-2 mt-4
+            className={`flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 group mb-2
               ${isActive('/settings') ? "bg-blue-50 text-blue-700 shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}
           >
             <FiShield className={`w-5 h-5 mr-3 transition-colors ${isActive('/settings') ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} />
             System Settings
           </Link>
         )}
+
       </nav>
 
       {/* Footer User Info */}

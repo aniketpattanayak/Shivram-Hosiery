@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import api from "@/utils/api";
 import { 
-  FiCheckCircle, FiActivity, FiUserCheck, FiBox
+  FiCheckCircle, FiActivity, FiUserCheck, FiBox, FiAlertTriangle
 } from "react-icons/fi";
 
 export default function QualityPage() {
@@ -21,7 +21,8 @@ export default function QualityPage() {
   const [stats, setStats] = useState({
     defectRate: "0.00",
     projectedPass: 0,
-    status: "Pending"
+    status: "Pending",
+    isHold: false // 🟢 New state for UI warning
   });
 
   useEffect(() => {
@@ -41,13 +42,10 @@ export default function QualityPage() {
     }
   };
 
-  // 🟢 FIX 1: CALCULATOR LOGIC (Updated Variable Name)
   useEffect(() => {
     if (!selectedJob) return;
 
-    // Look for 'totalQty' first (based on your old data), then fallbacks
     const total = selectedJob.totalQty || selectedJob.targetQuantity || selectedJob.quantity || 0;
-    
     const sample = Number(formData.sampleSize) || 0;
     const rejected = Number(formData.qtyRejected) || 0;
 
@@ -57,14 +55,13 @@ export default function QualityPage() {
     let passed = total - rejected;
     if (passed < 0) passed = 0;
 
-    let statusRec = "Excellent";
-    if (rate > 0) statusRec = "Rectification Required";
-    if (rate > 10) statusRec = "⚠️ High Failure Rate";
+    // 🟢 UI WARNING LOGIC
+    const isHighFailure = rate >= 20;
 
     setStats({
         defectRate: rate.toFixed(2),
         projectedPass: passed,
-        status: statusRec
+        isHold: isHighFailure
     });
 
   }, [formData.sampleSize, formData.qtyRejected, selectedJob]);
@@ -77,17 +74,27 @@ export default function QualityPage() {
     if (!sample || sample <= 0) return alert("Please enter a valid Sample Size");
     if (rejected > sample) return alert("Rejected quantity cannot be more than Sample Size!");
 
-    if(!confirm(`Confirm QC Results?\n\n• Inspector: ${inspectorName}\n• Approved: ${stats.projectedPass} units`)) return;
+    // 🟢 Custom Confirmation Message
+    let confirmMsg = `Confirm QC Results?\n\n• Inspector: ${inspectorName}`;
+    if (stats.isHold) {
+        confirmMsg += `\n\n⚠️ WARNING: DEFECT RATE IS ${stats.defectRate}% (>= 20%).\nThis batch will be put on QC HOLD and NO STOCK will be added.`;
+    } else {
+        confirmMsg += `\n• Approved Stock to Add: ${stats.projectedPass} units`;
+    }
+
+    if(!confirm(confirmMsg)) return;
 
     try {
-      await api.post("/quality/submit", {
+      const res = await api.post("/quality/submit", {
         jobId: selectedJob.jobId,
         sampleSize: sample,
         qtyRejected: rejected,
         notes: formData.notes
       });
 
-      alert("✅ QC Submitted Successfully!");
+      // 🟢 Show specific success/warning message from backend
+      alert(res.data.msg);
+
       setSelectedJob(null);
       setFormData({ sampleSize: "", qtyRejected: "", notes: "" });
       fetchPendingJobs();
@@ -144,7 +151,6 @@ export default function QualityPage() {
                             </td>
                             <td className="p-4 font-mono text-slate-500 text-xs">{job.productId?.sku || "N/A"}</td>
                             
-                            {/* 🟢 FIX 2: TABLE DISPLAY (Use totalQty) */}
                             <td className="p-4 text-center bg-blue-50/30">
                                 <span className="font-black text-slate-900 text-lg">
                                     {job.totalQty || job.targetQuantity || 0}
@@ -186,7 +192,6 @@ export default function QualityPage() {
             <div className="p-6 space-y-6">
                 
                 <div className="grid grid-cols-3 gap-3">
-                    {/* 🟢 FIX 3: MODAL DISPLAY (Use totalQty) */}
                     <div className="bg-slate-100 p-3 rounded-xl border border-slate-200 opacity-80">
                         <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
                             <FiBox /> Total Qty
@@ -219,18 +224,23 @@ export default function QualityPage() {
                     </div>
                 </div>
 
-                <div className="bg-slate-50 rounded-xl p-5 border border-slate-100 grid grid-cols-2 gap-4">
+                {/* 🟢 DYNAMIC STATUS BOX */}
+                <div className={`rounded-xl p-5 border grid grid-cols-2 gap-4 transition-colors ${stats.isHold ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
                     <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">Defect Rate</p>
-                        <p className={`text-2xl font-black ${Number(stats.defectRate) > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                        <p className={`text-[10px] font-bold uppercase ${stats.isHold ? 'text-red-500' : 'text-green-600'}`}>
+                            Defect Rate (Max 20%)
+                        </p>
+                        <p className={`text-2xl font-black ${stats.isHold ? 'text-red-600' : 'text-green-700'}`}>
                             {stats.defectRate}%
                         </p>
+                        {stats.isHold && <span className="text-[10px] font-bold bg-red-200 text-red-800 px-2 py-0.5 rounded">QC HOLD</span>}
                     </div>
                     <div className="text-right">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase">Approved Stock</p>
-                            <p className="text-2xl font-black text-slate-900">
-                            {stats.projectedPass} <span className="text-sm text-slate-400 font-medium">pcs</span>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Stock to Add</p>
+                            <p className={`text-2xl font-black ${stats.isHold ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+                                {stats.projectedPass} <span className="text-sm font-medium">pcs</span>
                             </p>
+                            {stats.isHold && <p className="text-[10px] text-red-500 font-bold">0 Will be added</p>}
                     </div>
                 </div>
 
@@ -246,9 +256,10 @@ export default function QualityPage() {
 
                 <button 
                     onClick={handleSubmit}
-                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-green-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                    className={`w-full py-3 text-white font-bold rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 
+                    ${stats.isHold ? 'bg-red-600 hover:bg-red-700 shadow-red-200' : 'bg-green-600 hover:bg-green-700 shadow-green-200'}`}
                 >
-                    <FiCheckCircle /> Confirm QC
+                    {stats.isHold ? <><FiAlertTriangle /> Trigger QC HOLD</> : <><FiCheckCircle /> Confirm & Add Stock</>}
                 </button>
 
             </div>
