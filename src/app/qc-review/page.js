@@ -21,7 +21,8 @@ export default function AdminQCReview() {
 
   const fetchHeldJobs = async () => {
     try {
-      const res = await api.get("/quality/held");
+      // ✅ FIX: Added "/procurement" because server.js mounts routes there
+      const res = await api.get("/procurement/qc-review-list");
       setHeldJobs(res.data);
     } catch (error) {
       console.error("Error fetching held jobs:", error);
@@ -41,15 +42,17 @@ export default function AdminQCReview() {
     if (!selectedJob || !decision) return;
 
     try {
-      const res = await api.post("/quality/review", {
-        jobId: selectedJob.jobId,
-        decision: decision,
+      // ✅ FIX: Added "/procurement" here too
+      // NOTE: Make sure you create this route in your backend file next!
+      const res = await api.post("/procurement/qc-decision", {
+        orderId: selectedJob._id,
+        decision: decision, // 'approve' or 'reject'
         adminNotes: adminNote
       });
       
       setModalOpen(false);
       setSelectedJob(null);
-      alert(res.data.msg); 
+      // alert(res.data.msg); 
       fetchHeldJobs(); 
     } catch (error) {
       alert("Error: " + (error.response?.data?.msg || error.message));
@@ -86,32 +89,36 @@ export default function AdminQCReview() {
             <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                 <tr>
                     <th className="p-4 text-xs font-bold text-slate-500 uppercase border-b border-slate-200 w-32">Status</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase border-b border-slate-200 w-32">Job ID</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Product</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 uppercase border-b border-slate-200 w-32">PO #</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Vendor / Item</th>
                     
                     <th className="p-4 text-xs font-bold text-slate-500 uppercase border-b border-slate-200 text-center bg-blue-50/10 w-24">Total Batch</th>
-                    <th className="p-4 text-xs font-bold text-blue-700 uppercase border-b border-slate-200 text-center bg-blue-50/30 w-24">Sample Size</th>
+                    <th className="p-4 text-xs font-bold text-blue-700 uppercase border-b border-slate-200 text-center bg-blue-50/30 w-24">Sample</th>
                     <th className="p-4 text-xs font-bold text-red-600 uppercase border-b border-slate-200 text-center bg-red-50/30 w-24">Rejected</th>
                     
                     <th className="p-4 text-xs font-bold text-red-600 uppercase border-b border-slate-200 text-center w-24">Rate %</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase border-b border-slate-200 w-64">Inspector Note</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase border-b border-slate-200 text-center w-24">Stock Add</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 uppercase border-b border-slate-200 w-64">Inspector Info</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 uppercase border-b border-slate-200 text-center w-24">Potential Stock</th>
                     <th className="p-4 text-xs font-bold text-slate-500 uppercase border-b border-slate-200 text-right w-32">Action</th>
                 </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {heldJobs.map((job) => {
-                const qc = job.qcResult || {}; 
-
-                // 🟢 FIX: Check ALL possible field names for Total Qty
-                // 1. Try QC Snapshot (totalBatchQty)
-                // 2. Try Job Field A (totalQty)
-                // 3. Try Job Field B (targetQuantity)
-                const finalTotal = qc.totalBatchQty || job.totalQty || job.targetQuantity || 0;
+              {heldJobs.map((order) => {
+                // DATA MAPPING LOGIC
+                // Find the QC Fail history log
+                const lastLog = order.history && order.history.length > 0 
+                    ? order.history[order.history.length - 1] 
+                    : {};
+                
+                const totalQty = lastLog.qty || 0;
+                const rejectedQty = lastLog.rejected || 0;
+                // Calculate rate safely
+                const rate = totalQty > 0 ? ((rejectedQty / totalQty) * 100).toFixed(1) + "%" : "0%";
+                const goodQty = totalQty - rejectedQty;
 
                 return (
-                  <tr key={job._id} className="hover:bg-slate-50 transition-colors group">
+                  <tr key={order._id} className="hover:bg-slate-50 transition-colors group">
                     
                     {/* Status Badge */}
                     <td className="p-4">
@@ -120,47 +127,53 @@ export default function AdminQCReview() {
                          </span>
                     </td>
 
-                    {/* Job ID & Date */}
+                    {/* PO Number / ID */}
                     <td className="p-4">
-                        <div className="font-mono text-xs font-bold text-slate-700">{job.jobId}</div>
-                        <div className="text-[10px] text-slate-400">{new Date(job.updatedAt).toLocaleDateString()}</div>
+                        <div className="font-mono text-xs font-bold text-slate-700">
+                            {order.poNumber || order._id.substr(-6).toUpperCase()}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                            {new Date(order.updatedAt).toLocaleDateString()}
+                        </div>
                     </td>
 
-                    {/* Product */}
+                    {/* Vendor / Product */}
                     <td className="p-4">
-                        <div className="font-bold text-slate-900 text-sm">{job.productId?.name || "Unknown"}</div>
-                        <div className="text-xs text-slate-500 font-mono">SKU: {job.productId?.sku || "N/A"}</div>
+                        <div className="font-bold text-slate-900 text-sm">{order.vendor_id?.name || "Unknown Vendor"}</div>
+                        <div className="text-xs text-slate-500 font-mono">{order.itemName || "Item Name N/A"}</div>
                     </td>
 
-                    {/* 🟢 TOTAL BATCH (Fixed) */}
+                    {/* Total Batch */}
                     <td className="p-4 text-center font-bold text-slate-700 bg-blue-50/10 border-l border-slate-100">
-                        {finalTotal}
+                        {totalQty}
                     </td>
 
                     {/* Sample Size */}
                     <td className="p-4 text-center font-black text-blue-700 bg-blue-50/30 border-l border-white">
-                        {qc.sampleSize || 0}
+                        {totalQty} 
                     </td>
 
                     {/* Rejected Qty */}
                     <td className="p-4 text-center font-black text-red-600 bg-red-50/30 border-l border-white">
-                        {qc.rejectedQty || 0}
+                        {rejectedQty}
                     </td>
 
                     {/* Rate % */}
                     <td className="p-4 text-center font-bold text-red-600 bg-red-50/10 border-l border-white">
-                        {qc.defectRate || "0%"}
+                        {rate}
                     </td>
 
-                    {/* Inspector Note */}
+                    {/* Inspector Info */}
                     <td className="p-4">
                         <div className="flex items-start gap-2">
                              <FiFileText className="text-slate-400 mt-0.5 flex-shrink-0" />
                              <div>
-                                 <p className="text-xs text-slate-600 italic line-clamp-2" title={qc.notes}>
-                                    "{qc.notes || "No notes"}"
+                                 <p className="text-xs text-slate-600 italic line-clamp-2">
+                                    "{lastLog.status || "QC Failed"}"
                                  </p>
-                                 <p className="text-[10px] text-slate-400 font-bold mt-0.5">{qc.inspectorName}</p>
+                                 <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                                    By: {lastLog.receivedBy || "Inspector"}
+                                 </p>
                              </div>
                         </div>
                     </td>
@@ -168,7 +181,7 @@ export default function AdminQCReview() {
                     {/* Potential Stock */}
                     <td className="p-4 text-center">
                         <span className="font-black text-slate-800">
-                            {qc.passedQty !== undefined ? qc.passedQty : (finalTotal - (qc.rejectedQty || 0))}
+                            {goodQty}
                         </span>
                         <span className="text-[10px] text-slate-400 block">pcs</span>
                     </td>
@@ -177,14 +190,14 @@ export default function AdminQCReview() {
                     <td className="p-4 text-right">
                         <div className="flex justify-end gap-2">
                             <button 
-                                onClick={() => openReviewModal(job, 'approve')}
+                                onClick={() => openReviewModal(order, 'approve')}
                                 className="p-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors"
                                 title="Force Accept"
                             >
                                 <FiCheck size={16} />
                             </button>
                             <button 
-                                onClick={() => openReviewModal(job, 'reject')}
+                                onClick={() => openReviewModal(order, 'reject')}
                                 className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-600 hover:text-white transition-colors"
                                 title="Reject & Discard"
                             >
@@ -210,7 +223,7 @@ export default function AdminQCReview() {
                  <h3 className={`text-lg font-black ${decision === 'approve' ? 'text-emerald-800' : 'text-red-800'}`}>
                    {decision === 'approve' ? 'Force Accept Batch' : 'Reject & Discard Batch'}
                  </h3>
-                 <p className="text-xs font-bold text-slate-500 mt-0.5">Job ID: {selectedJob.jobId}</p>
+                 <p className="text-xs font-bold text-slate-500 mt-0.5">PO ID: {selectedJob._id}</p>
                </div>
                <button onClick={() => setModalOpen(false)} className="w-8 h-8 rounded-full bg-white/50 hover:bg-white flex items-center justify-center transition-colors">✕</button>
             </div>

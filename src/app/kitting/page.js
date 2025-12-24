@@ -87,7 +87,6 @@ export default function KittingPage() {
     setCustomBOM(initialBOM);
   };
 
-  // 🟢 Updated Generator to handle Viewing and Downloading
   const generatePDF = (data, download = false) => {
     const doc = new jsPDF();
     doc.setFontSize(18); doc.text("MATERIAL ISSUE SLIP", 105, 15, null, null, "center");
@@ -116,7 +115,6 @@ export default function KittingPage() {
     if (download) {
         doc.save(`Issue_Slip_${data.jobId}.pdf`);
     } else {
-        // 🟢 Opens PDF in a new tab for viewing
         const blob = doc.output('blob');
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
@@ -234,10 +232,49 @@ export default function KittingPage() {
                 </div>
             </div>
         </div>
+
+        {/* ✅ FIXED: PDF Modal using 'fixed' to stay on top */}
+        {showPdfModal && pdfPreviewData && (
+            <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-white w-full max-w-xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center"><h3 className="font-bold text-slate-800 flex items-center gap-2"><FiPrinter/> Slip Preview</h3><button onClick={() => setShowPdfModal(false)} className="p-2 hover:bg-slate-200 rounded-full"><FiX /></button></div>
+                    <div className="p-8 bg-white overflow-y-auto font-mono text-sm border-b border-slate-200 text-slate-900">
+                        <div className="text-center mb-6"><h2 className="text-xl font-bold border-b-2 border-slate-800 inline-block pb-1">MATERIAL ISSUE SLIP</h2><p className="mt-1 font-bold text-slate-600">Shivram Hosiery Factory</p></div>
+                        <div className="flex justify-between mb-4"><div><p><strong>Job ID:</strong> {pdfPreviewData.jobId}</p><p><strong>Issued To:</strong> {pdfPreviewData.issuedTo}</p></div><div className="text-right"><p><strong>Date:</strong> {new Date().toLocaleDateString()}</p><p><strong>Issuer:</strong> {pdfPreviewData.issuerName}</p></div></div>
+                        <table className="w-full border-collapse border border-slate-800 mb-4">
+                            <thead><tr className="bg-slate-100">
+                                <th className="border border-slate-800 p-2 text-left">Material</th>
+                                <th className="border border-slate-800 p-2 text-left">Lot</th>
+                                <th className="border border-slate-800 p-2 text-center">Qty</th>
+                            </tr></thead>
+                            <tbody>{pdfPreviewData.items.map((item, i) => (<tr key={i}><td className="border border-slate-800 p-2">{item.materialName}</td><td className="border border-slate-800 p-2">{item.lotNumber || "FIFO"}</td><td className="border border-slate-800 p-2 text-center font-bold">{item.issueQty}</td></tr>))}</tbody>
+                        </table>
+                        <p><strong>Remarks:</strong> {pdfPreviewData.remarks || "-"}</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 flex justify-end gap-3">
+                        <button onClick={() => setShowPdfModal(false)} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-lg">Close</button>
+                        <button onClick={() => generatePDF(pdfPreviewData, false)} className="px-6 py-2 bg-blue-500 text-white font-bold rounded-lg flex items-center gap-2">View Full PDF</button>
+                        <button onClick={() => generatePDF(pdfPreviewData, true)} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700 flex items-center gap-2"><FiDownload /> Download PDF</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* ✅ FIXED: Material Modal using 'fixed' */}
+        {isMaterialModalOpen && (
+            <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center"><h3 className="font-bold text-slate-800">Select Material</h3><button onClick={() => setIsMaterialModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><FiX /></button></div>
+                    <div className="p-4 border-b border-slate-100"><div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-900"><FiSearch className="text-slate-400" /><input type="text" placeholder="Search..." className="bg-transparent outline-none flex-1 text-sm font-bold" autoFocus value={materialSearch} onChange={(e) => setMaterialSearch(e.target.value)}/></div></div>
+                    <div className="flex-1 overflow-y-auto p-2 text-slate-900">{allMaterials.filter(m => m.name.toLowerCase().includes(materialSearch.toLowerCase())).map(m => (<button key={m._id} onClick={() => handleAddMaterial(m)} className="w-full text-left p-3 hover:bg-blue-50 rounded-lg flex justify-between items-center group transition-colors"><div><p className="font-bold text-slate-700 group-hover:text-blue-700">{m.name}</p><p className="text-xs text-slate-400">Stock: {Number(m.stock?.current || 0).toFixed(2)} {m.unit}</p></div><FiPlus className="text-slate-300 group-hover:text-blue-600" /></button>))}</div>
+                </div>
+            </div>
+        )}
       </div>
     );
   }
 
+  // --- MAIN LIST VIEW ---
   return (
     <div className="p-8 max-w-[1600px] mx-auto min-h-screen">
         <div className="mb-6 flex justify-between items-end">
@@ -319,36 +356,9 @@ export default function KittingPage() {
             )}
         </div>
 
-        {/* PDF PREVIEW MODAL */}
-        {showPdfModal && pdfPreviewData && (
-            <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-white w-full max-w-xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                    <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center"><h3 className="font-bold text-slate-800 flex items-center gap-2"><FiPrinter/> Slip Preview</h3><button onClick={() => setShowPdfModal(false)} className="p-2 hover:bg-slate-200 rounded-full"><FiX /></button></div>
-                    <div className="p-8 bg-white overflow-y-auto font-mono text-sm border-b border-slate-200 text-slate-900">
-                        <div className="text-center mb-6"><h2 className="text-xl font-bold border-b-2 border-slate-800 inline-block pb-1">MATERIAL ISSUE SLIP</h2><p className="mt-1 font-bold text-slate-600">Shivram Hosiery Factory</p></div>
-                        <div className="flex justify-between mb-4"><div><p><strong>Job ID:</strong> {pdfPreviewData.jobId}</p><p><strong>Issued To:</strong> {pdfPreviewData.issuedTo}</p></div><div className="text-right"><p><strong>Date:</strong> {new Date().toLocaleDateString()}</p><p><strong>Issuer:</strong> {pdfPreviewData.issuerName}</p></div></div>
-                        <table className="w-full border-collapse border border-slate-800 mb-4">
-                            <thead><tr className="bg-slate-100">
-                                <th className="border border-slate-800 p-2 text-left">Material</th>
-                                <th className="border border-slate-800 p-2 text-left">Lot</th>
-                                <th className="border border-slate-800 p-2 text-center">Qty</th>
-                            </tr></thead>
-                            <tbody>{pdfPreviewData.items.map((item, i) => (<tr key={i}><td className="border border-slate-800 p-2">{item.materialName}</td><td className="border border-slate-800 p-2">{item.lotNumber || "FIFO"}</td><td className="border border-slate-800 p-2 text-center font-bold">{item.issueQty}</td></tr>))}</tbody>
-                        </table>
-                        <p><strong>Remarks:</strong> {pdfPreviewData.remarks || "-"}</p>
-                    </div>
-                    <div className="p-4 bg-slate-50 flex justify-end gap-3">
-                        <button onClick={() => setShowPdfModal(false)} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-lg">Close</button>
-                        <button onClick={() => generatePDF(pdfPreviewData, false)} className="px-6 py-2 bg-blue-500 text-white font-bold rounded-lg flex items-center gap-2">View Full PDF</button>
-                        <button onClick={() => generatePDF(pdfPreviewData, true)} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700 flex items-center gap-2"><FiDownload /> Download PDF</button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* JOB HISTORY DETAIL MODAL */}
+        {/* ✅ FIXED: History View Modal using 'fixed' */}
         {viewHistoryJob && (
-            <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
                 <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                      <div className="p-6 border-b bg-slate-50 flex justify-between items-center">
                         <div><h3 className="text-xl font-black text-slate-800">History Log: {viewHistoryJob.jobId}</h3><p className="text-sm text-slate-500">{viewHistoryJob.productId?.name}</p></div>
@@ -388,7 +398,6 @@ export default function KittingPage() {
                          </table>
                      </div>
                      <div className="p-4 border-t bg-slate-50 text-right flex justify-end gap-3">
-                         {/* 🟢 Action buttons for History: View and Download */}
                          <button onClick={() => {
                              const pdfData = { jobId: viewHistoryJob.jobId, issuedTo: viewHistoryJob.issuedMaterials[0]?.issuedTo || "Various", issuerName: "Pramod", remarks: "Complete History", items: viewHistoryJob.issuedMaterials.map(m => ({ materialName: m.materialName, lotNumber: m.lotNumber, issueQty: m.qtyIssued })) };
                              generatePDF(pdfData, false);
@@ -401,17 +410,6 @@ export default function KittingPage() {
                          
                          <button onClick={() => setViewHistoryJob(null)} className="px-6 py-2 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300">Close</button>
                      </div>
-                </div>
-            </div>
-        )}
-
-        {/* MATERIAL MODAL */}
-        {isMaterialModalOpen && (
-            <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-                    <div className="p-4 border-b border-slate-100 flex justify-between items-center"><h3 className="font-bold text-slate-800">Select Material</h3><button onClick={() => setIsMaterialModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><FiX /></button></div>
-                    <div className="p-4 border-b border-slate-100"><div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-900"><FiSearch className="text-slate-400" /><input type="text" placeholder="Search..." className="bg-transparent outline-none flex-1 text-sm font-bold" autoFocus value={materialSearch} onChange={(e) => setMaterialSearch(e.target.value)}/></div></div>
-                    <div className="flex-1 overflow-y-auto p-2 text-slate-900">{allMaterials.filter(m => m.name.toLowerCase().includes(materialSearch.toLowerCase())).map(m => (<button key={m._id} onClick={() => handleAddMaterial(m)} className="w-full text-left p-3 hover:bg-blue-50 rounded-lg flex justify-between items-center group transition-colors"><div><p className="font-bold text-slate-700 group-hover:text-blue-700">{m.name}</p><p className="text-xs text-slate-400">Stock: {Number(m.stock?.current || 0).toFixed(2)} {m.unit}</p></div><FiPlus className="text-slate-300 group-hover:text-blue-600" /></button>))}</div>
                 </div>
             </div>
         )}
