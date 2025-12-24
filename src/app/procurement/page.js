@@ -14,7 +14,9 @@ import {
   FiTag,
   FiBox,
   FiActivity,
-  FiRefreshCw
+  FiRefreshCw,
+  FiMapPin, // 🟢 New Icon
+  FiMail // 🟢 New Icon
 } from "react-icons/fi";
 
 export default function ProcurementPage() {
@@ -28,11 +30,15 @@ export default function ProcurementPage() {
   const [pendingTrades, setPendingTrades] = useState([]);
   const [selectedJobId, setSelectedJobId] = useState(null);
 
+  // 🟢 UPDATED STATE FOR NEW FIELDS
   const [newVendor, setNewVendor] = useState({
     name: "",
     category: "Material Supplier",
     services: [],
     phone: "",
+    email: "",    // New
+    gst: "",      // New
+    address: ""   // New
   });
 
   const [formData, setFormData] = useState({
@@ -64,40 +70,35 @@ export default function ProcurementPage() {
     }
   };
 
-  // 🟢 1. LOGIC: IDENTIFY CRITICAL STOCK
+  // 1. LOGIC: IDENTIFY CRITICAL STOCK
   const criticalMaterials = useMemo(() => {
     return materials.filter(m => {
         const current = m.stock?.current || 0;
-        const safety = m.safetyStock || 0; // Ensure your Material model has this, otherwise defaults 0
-        // Show if Safety Stock is set AND Current is less than or equal to Safety
+        const safety = m.safetyStock || 0; 
         return safety > 0 && current <= safety;
     });
   }, [materials]);
 
-  // 🟢 2. ACTION: PRE-FILL FORM FOR RESTOCKING
+  // 2. ACTION: PRE-FILL FORM FOR RESTOCKING
   const handleRestock = (material) => {
       setActiveTab("RM");
       
       const current = material.stock?.current || 0;
       const safety = material.safetyStock || 0;
       const deficit = Math.max(0, safety - current);
-      // If deficit is 0 (exact match), suggest buying at least some buffer, e.g. 10% or 10 units
       const suggestedQty = deficit === 0 ? 10 : deficit; 
 
       setFormData({
-          vendor: "", // User must select vendor, or we could find last supplier
+          vendor: "", 
           itemId: material._id,
           itemType: "Raw Material",
           qty: suggestedQty,
-          unitPrice: "" // Rate varies
+          unitPrice: "" 
       });
       
-      // Scroll to form
       window.scrollTo({ top: 300, behavior: "smooth" });
   };
 
-
-  // Helper: Find Vendor Name using ID
   const getVendorNameForCard = (req) => {
       if (!req.vendorId) return "Not Assigned";
       if (typeof req.vendorId === 'object' && req.vendorId.name) return req.vendorId.name;
@@ -106,7 +107,6 @@ export default function ProcurementPage() {
       return "Unknown Vendor"; 
   };
 
-  // LOAD TRADING REQUEST
   const handleLoadRequest = (req) => {
     setActiveTab("FG");
 
@@ -179,6 +179,9 @@ export default function ProcurementPage() {
         category: "Material Supplier",
         services: [],
         phone: "",
+        email: "",
+        gst: "",
+        address: ""
       });
       fetchData();
     } catch (error) {
@@ -220,7 +223,7 @@ export default function ProcurementPage() {
           </button>
         </div>
 
-        {/* 🟢 CRITICAL STOCK ALERT SECTION */}
+        {/* CRITICAL STOCK ALERT */}
         {criticalMaterials.length > 0 && (
           <div className="bg-white border border-red-100 rounded-2xl shadow-sm overflow-hidden animate-in slide-in-from-top-4">
              <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between">
@@ -520,9 +523,12 @@ export default function ProcurementPage() {
                         <FiTrash2 />
                       </button>
                     </div>
-                    <div className="mt-4 flex gap-4 text-xs font-bold text-slate-500">
+                    {/* 🟢 Vendor Details Section */}
+                    <div className="mt-4 grid grid-cols-2 gap-y-2 gap-x-4 text-xs font-bold text-slate-500">
                       {vendor.phone && <div className="flex items-center gap-1"><FiPhone /> {vendor.phone}</div>}
-                      {vendor.services.length > 0 && <div className="text-slate-400">Handles: {vendor.services.join(", ")}</div>}
+                      {vendor.email && <div className="flex items-center gap-1"><FiMail /> {vendor.email}</div>}
+                      {vendor.address && <div className="flex items-center gap-1 col-span-2"><FiMapPin /> {vendor.address}</div>}
+                      {vendor.gst && <div className="col-span-2 text-slate-400 font-mono">GST: {vendor.gst}</div>}
                     </div>
                   </div>
                 ))}
@@ -556,10 +562,29 @@ export default function ProcurementPage() {
                     <div className="absolute right-4 top-3.5 text-slate-400 pointer-events-none">▼</div>
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Phone / Contact</label>
-                  <input className="w-full border border-slate-200 p-3 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" value={newVendor.phone} onChange={(e) => setNewVendor({ ...newVendor, phone: e.target.value })} placeholder="Optional" />
+                
+                {/* 🟢 NEW FIELDS */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Phone</label>
+                        <input className="w-full border border-slate-200 p-3 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" value={newVendor.phone} onChange={(e) => setNewVendor({ ...newVendor, phone: e.target.value })} placeholder="9876543210" />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Email</label>
+                        <input type="email" className="w-full border border-slate-200 p-3 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" value={newVendor.email} onChange={(e) => setNewVendor({ ...newVendor, email: e.target.value })} placeholder="vendor@mail.com" />
+                    </div>
                 </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Address</label>
+                  <textarea rows="2" className="w-full border border-slate-200 p-3 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none resize-none" value={newVendor.address} onChange={(e) => setNewVendor({ ...newVendor, address: e.target.value })} placeholder="Shop 12, Industrial Area..." />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">GST Number</label>
+                  <input className="w-full border border-slate-200 p-3 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" value={newVendor.gst} onChange={(e) => setNewVendor({ ...newVendor, gst: e.target.value })} placeholder="27ABCDE1234F1Z5" />
+                </div>
+
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowVendorModal(false)} className="flex-1 bg-slate-100 text-slate-600 font-bold py-3.5 rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
                   <button className="flex-1 bg-slate-900 text-white font-bold py-3.5 rounded-xl hover:bg-slate-800 transition-all shadow-lg">Save Vendor</button>
