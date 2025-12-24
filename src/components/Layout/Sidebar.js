@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  FiLogOut, FiChevronDown, FiChevronRight, FiShield, FiAlertTriangle, FiPackage, FiZap
-} from "react-icons/fi";
+  FiLogOut, FiChevronDown, FiChevronRight, FiShield, FiAlertTriangle
+} from "react-icons/fi"; 
 import { SYSTEM_MODULES } from "@/utils/navigationConfig";
 import api from "@/utils/api"; 
 
@@ -94,31 +94,11 @@ export default function Sidebar() {
                 return hasAccess(childKey);
             });
 
-            // 🟢 MANUALLY INJECT "KITTING" INTO MANUFACTURING
-            if (item.groupName === 'Manufacturing' && (user?.role === 'Admin' || hasAccess('production'))) {
-                const kittingHref = "/kitting"; 
-                if (!childItemsWithAccess.some(i => i.href === kittingHref)) {
-                    childItemsWithAccess.push({ name: "Full Kitting", href: kittingHref, icon: FiPackage });
-                }
-            }
-
-            // 🟢 MANUALLY INJECT "DIRECT STOCK" INTO PROCUREMENT
-            if (item.groupName === 'Procurement' && (user?.role === 'Admin' || hasAccess('procurement'))) {
-                const directEntryHref = "/direct-entry"; 
-                // Add it only if it doesn't exist yet
-                if (!childItemsWithAccess.some(i => i.href === directEntryHref)) {
-                    childItemsWithAccess.push({ 
-                        name: "Direct Stock (No PO)", 
-                        href: directEntryHref, 
-                        icon: FiZap 
-                    });
-                }
-            }
+            // 🟢 ALL MANUAL INJECTIONS REMOVED (Now handled in navigationConfig.js)
 
             if (childItemsWithAccess.length === 0) return null;
             
             const isOpen = expandedGroups[item.groupName];
-            // Check if any child is active to highlight the group
             const isGroupActive = childItemsWithAccess.some(sub => isActive(sub.href));
 
             return (

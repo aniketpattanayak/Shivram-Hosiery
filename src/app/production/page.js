@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { 
   FiScissors, FiCheckCircle, FiTrash2, FiClock, 
-  FiLayers, FiList
+  FiLayers, FiList, FiBox
 } from 'react-icons/fi';
 import StrategyModal from './StrategyModal';
 import api from '@/utils/api';
@@ -141,6 +141,10 @@ export default function ProductionPage() {
                     <tr>
                         <th className="p-4 border-b w-64">Ref / Order</th>
                         <th className="p-4 border-b">Product</th>
+                        
+                        {/* 🟢 NEW COLUMN: Available Stock */}
+                        <th className="p-4 border-b text-center w-24">In Stock</th>
+
                         <th className="p-4 border-b text-right">Total Order</th>
                         <th className="p-4 border-b text-right text-blue-600">Planned</th>
                         <th className="p-4 border-b text-right text-red-600">Unplanned</th>
@@ -154,6 +158,9 @@ export default function ProductionPage() {
                         const planned = plan.plannedQty || 0;
                         const unplanned = plan.isGlobal ? plan.unplannedQty : (total - planned);
                         
+                        // 🟢 GET STOCK FROM PRODUCT OBJECT
+                        const currentStock = plan.product?.stock?.warehouse || 0;
+
                         return (
                             <tr key={plan._id} className={`hover:bg-slate-50 transition-colors ${plan.isGlobal ? 'bg-blue-50/10' : ''}`}>
                                 <td className="p-4 align-top">
@@ -162,7 +169,7 @@ export default function ProductionPage() {
                                             <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] uppercase tracking-wide font-bold w-fit">
                                                 BATCH ({plan.count})
                                             </span>
-                                            {/* 🟢 SHOW ORDER NUMBERS IN GLOBAL VIEW */}
+                                            {/* SHOW ORDER NUMBERS IN GLOBAL VIEW */}
                                             <div className="flex flex-wrap gap-1">
                                                 {plan.aggregatedPlans.map(sub => (
                                                     <span key={sub._id} className="text-[10px] font-mono border border-slate-200 bg-white px-1.5 py-0.5 rounded text-slate-500">
@@ -181,6 +188,17 @@ export default function ProductionPage() {
                                     {plan.product?.name || 'Unknown Product'}
                                     <div className="text-[10px] text-slate-400 font-normal">{plan.product?.sku}</div>
                                 </td>
+
+                                {/* 🟢 STOCK COLUMN DATA */}
+                                <td className="p-4 align-top text-center">
+                                    <div className={`inline-flex flex-col items-center px-2 py-1 rounded-lg border ${currentStock > 0 ? 'bg-purple-50 border-purple-100' : 'bg-slate-50 border-slate-100'}`}>
+                                        <span className={`font-black text-sm ${currentStock > 0 ? 'text-purple-700' : 'text-slate-400'}`}>
+                                            {currentStock}
+                                        </span>
+                                        <span className="text-[9px] text-slate-400 uppercase font-bold tracking-tight">Avail</span>
+                                    </div>
+                                </td>
+
                                 <td className="p-4 align-top text-right font-black text-slate-900">
                                     {total}
                                 </td>
