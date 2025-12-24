@@ -42,7 +42,7 @@ function NewQuoteContent() {
         description: "",
         qty: 1,
         rate: 0,
-        gstPercent: 0, // 🟢 Set to 0 to disable tax
+        gstPercent: 0, // Set to 0 to disable tax
       },
     ],
     terms: {
@@ -57,15 +57,23 @@ function NewQuoteContent() {
     const fetchData = async () => {
       try {
         const [clientsRes, productsRes] = await Promise.all([
-          api.get("/sales/clients"),
+          api.get("/sales/clients?limit=1000"), // Fetch more for dropdown
           api.get("/products"),
         ]);
-        setClients(clientsRes.data);
+
+        // 🟢 FIX: Handle Paginated Response vs Simple Array
+        let clientList = [];
+        if (Array.isArray(clientsRes.data)) {
+            clientList = clientsRes.data; // Old Backend Format
+        } else {
+            clientList = clientsRes.data.data || []; // New Backend Format
+        }
+        setClients(clientList);
         setProducts(productsRes.data);
 
         // AUTO-SYNC LOGIC
-        if (preSelectedClientId && clientsRes.data.length > 0) {
-          const foundClient = clientsRes.data.find(
+        if (preSelectedClientId && clientList.length > 0) {
+          const foundClient = clientList.find(
             (c) => String(c._id) === String(preSelectedClientId)
           );
           
@@ -156,7 +164,7 @@ function NewQuoteContent() {
           description: "",
           qty: 1,
           rate: 0,
-          gstPercent: 0, // 🟢 Set to 0
+          gstPercent: 0,
         },
       ],
     }));
@@ -168,7 +176,7 @@ function NewQuoteContent() {
     setFormData({ ...formData, items: newItems });
   };
 
-  // 🟢 UPDATED TOTALS: Removed Tax Logic
+  // UPDATED TOTALS: Removed Tax Logic
   const totals = useMemo(() => {
     let subTotal = 0;
     let taxAmount = 0; // Always 0 now
@@ -176,7 +184,6 @@ function NewQuoteContent() {
     formData.items.forEach((item) => {
       const lineTotal = Number(item.qty) * Number(item.rate);
       subTotal += lineTotal;
-      // Tax calculation removed
     });
 
     return { subTotal, taxAmount, grandTotal: subTotal };
@@ -444,7 +451,7 @@ function NewQuoteContent() {
             ))}
           </div>
 
-          {/* Grand Totals (UPDATED: NO GST) */}
+          {/* Grand Totals */}
           <div className="mt-6 flex justify-end">
             <div className="w-64 space-y-2 border-t border-slate-200 pt-4">
               <div className="flex justify-between text-sm text-slate-500">
