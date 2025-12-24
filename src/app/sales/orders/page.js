@@ -327,7 +327,7 @@ export default function NewOrderPage() {
                     </div>
                 ) : (
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Target Delivery Date</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Order Date</label>
                         <input type="date" name="deliveryDate" value={formData.deliveryDate} onChange={(e) => setFormData({...formData, deliveryDate: e.target.value})} className="w-full p-3 bg-white border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-100 outline-none" required />
                     </div>
                 )}

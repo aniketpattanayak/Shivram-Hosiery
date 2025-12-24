@@ -182,8 +182,7 @@ export default function InventoryPage() {
             <tr className="bg-slate-50 border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500 font-bold">
               <th className="px-6 py-4 w-64">Item Details</th>
               <th className="px-6 py-4">Type</th>
-              <th className="px-6 py-4">Physical</th>
-              <th className="px-6 py-4">Reserved</th>
+              <th className="px-6 py-4">Stock</th>
               <th className="px-6 py-4 bg-slate-100/50 border-l border-slate-200">Stock At Least</th>
               <th className="px-6 py-4 bg-slate-100/50 w-48">Health %</th>
               <th className="px-6 py-4 text-center">Status</th>
@@ -222,10 +221,7 @@ export default function InventoryPage() {
                     )}
                   </td>
 
-                  <td className="px-6 py-4 font-mono font-bold text-amber-600 bg-amber-50/10">
-                     {Number(item.reserved).toFixed(2)}
-                  </td>
-                  
+                 
                   {/* Stock At Least */}
                   <td className="px-6 py-4 font-mono font-bold text-slate-500 bg-slate-50/50 border-l border-slate-100">
                     {Number(item.stockAtLeast).toFixed(2)}

@@ -12,10 +12,10 @@ import {
   FiArrowLeft,
 } from "react-icons/fi";
 
-// 🟢 1. INTERNAL COMPONENT: Contains all the Logic & Search Params
+// 🟢 1. INTERNAL COMPONENT
 function NewQuoteContent() {
   const router = useRouter();
-  const searchParams = useSearchParams(); 
+  const searchParams = useSearchParams();
   const preSelectedClientId = searchParams.get("clientId");
 
   const [loading, setLoading] = useState(false);
@@ -26,7 +26,7 @@ function NewQuoteContent() {
 
   // Form State
   const [formData, setFormData] = useState({
-    clientId: "",
+    clientId: "", // Empty if new client
     clientName: "",
     clientAddress: "",
     clientGst: "",
@@ -42,7 +42,7 @@ function NewQuoteContent() {
         description: "",
         qty: 1,
         rate: 0,
-        gstPercent: 0, // Set to 0 to disable tax
+        gstPercent: 0,
       },
     ],
     terms: {
@@ -52,31 +52,31 @@ function NewQuoteContent() {
     },
   });
 
-  // Fetch Master Data & Handle Auto-Select
+  // Fetch Master Data
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [clientsRes, productsRes] = await Promise.all([
-          api.get("/sales/clients?limit=1000"), // Fetch more for dropdown
+          api.get("/sales/clients?limit=1000"),
           api.get("/products"),
         ]);
 
-        // 🟢 FIX: Handle Paginated Response vs Simple Array
+        // Handle Paginated vs Array Response
         let clientList = [];
         if (Array.isArray(clientsRes.data)) {
-            clientList = clientsRes.data; // Old Backend Format
+          clientList = clientsRes.data;
         } else {
-            clientList = clientsRes.data.data || []; // New Backend Format
+          clientList = clientsRes.data.data || [];
         }
         setClients(clientList);
         setProducts(productsRes.data);
 
-        // AUTO-SYNC LOGIC
+        // AUTO-SYNC LOGIC (For "Quote" button from Client List)
         if (preSelectedClientId && clientList.length > 0) {
           const foundClient = clientList.find(
             (c) => String(c._id) === String(preSelectedClientId)
           );
-          
+
           if (foundClient) {
             setFormData((prev) => ({
               ...prev,
@@ -104,33 +104,39 @@ function NewQuoteContent() {
     fetchData();
   }, [preSelectedClientId]);
 
-  // Handle Client Selection
-  const handleClientChange = (e) => {
-    const selectedClient = clients.find((c) => c._id === e.target.value);
-    if (selectedClient) {
+  // 🟢 HYBRID CLIENT HANDLER (Select or Type New)
+  const handleClientNameChange = (e) => {
+    const val = e.target.value;
+    const matchedClient = clients.find(
+      (c) => c.name.toLowerCase() === val.toLowerCase()
+    );
+
+    if (matchedClient) {
+      // Existing Client Found -> Auto-fill
       setFormData((prev) => ({
         ...prev,
-        clientId: selectedClient._id,
-        clientName: selectedClient.name,
-        clientAddress: selectedClient.billToAddress || selectedClient.address,
-        clientGst: selectedClient.gstNumber || "",
+        clientId: matchedClient._id,
+        clientName: matchedClient.name,
+        clientAddress:
+          matchedClient.billToAddress || matchedClient.address || "",
+        clientGst: matchedClient.gstNumber || "",
         terms: {
           ...prev.terms,
-          payment: selectedClient.paymentTerms || prev.terms.payment,
+          payment: matchedClient.paymentTerms || prev.terms.payment,
         },
       }));
     } else {
+      // New Client Typed -> Allow editing address/GST, Clear ID
       setFormData((prev) => ({
         ...prev,
-        clientId: "",
-        clientName: "",
-        clientAddress: "",
-        clientGst: "",
+        clientId: "", // Backend will create new client if this is empty
+        clientName: val,
+        clientAddress: "", // User must type this for new client
+        clientGst: "", // User must type this for new client
       }));
     }
   };
 
-  // Handle Product Selection
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
 
@@ -176,25 +182,30 @@ function NewQuoteContent() {
     setFormData({ ...formData, items: newItems });
   };
 
-  // UPDATED TOTALS: Removed Tax Logic
   const totals = useMemo(() => {
     let subTotal = 0;
-    let taxAmount = 0; // Always 0 now
-
     formData.items.forEach((item) => {
       const lineTotal = Number(item.qty) * Number(item.rate);
       subTotal += lineTotal;
     });
-
-    return { subTotal, taxAmount, grandTotal: subTotal };
+    return { subTotal, grandTotal: subTotal };
   }, [formData.items]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
+    // Safety check for New Clients
+    if (!formData.clientId && !formData.clientAddress) {
+      alert("For a New Client, please enter the Billing Address.");
+      setLoading(false);
+      return;
+    }
+
     try {
+      // 🟢 Send payload (if clientId is empty, backend creates new client)
       await api.post("/sales/quotes", formData);
-      alert("✅ Quotation Generated Successfully!");
+      alert("✅ Quotation Generated & Client Saved Successfully!");
       router.push("/sales/quotes");
     } catch (error) {
       alert("Error: " + (error.response?.data?.msg || error.message));
@@ -205,7 +216,6 @@ function NewQuoteContent() {
 
   return (
     <div className="max-w-6xl mx-auto animate-in fade-in duration-500 pb-20 p-6">
-      {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <button
           onClick={() => router.back()}
@@ -235,31 +245,45 @@ function NewQuoteContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="col-span-2">
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                Select Client
+                Customer Name
               </label>
-              <select
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500/20 outline-none"
-                onChange={handleClientChange}
-                value={formData.clientId}
+              {/* 🟢 HYBRID INPUT: Select OR Type */}
+              <input
+                list="client-list"
+                type="text"
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:font-normal"
+                onChange={handleClientNameChange}
+                value={formData.clientName}
+                placeholder="Search existing or type new client name..."
                 required
-              >
-                <option value="">-- Choose from Client Master --</option>
+              />
+              <datalist id="client-list">
                 {clients.map((client) => (
-                  <option key={client._id} value={client._id}>
-                    {client.name}
+                  <option key={client._id} value={client.name}>
+                    {client.gstNumber ? `GST: ${client.gstNumber}` : "Lead"}
                   </option>
                 ))}
-              </select>
+              </datalist>
+              {!formData.clientId && formData.clientName && (
+                <p className="text-xs text-green-600 mt-1 font-bold">
+                  ✨ New Client: Will be saved to Master automatically.
+                </p>
+              )}
             </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
                 Billing Address
               </label>
               <textarea
-                readOnly
                 value={formData.clientAddress}
-                className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-600 resize-none"
+                onChange={(e) =>
+                  setFormData({ ...formData, clientAddress: e.target.value })
+                }
+                className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 resize-none focus:ring-2 focus:ring-blue-100 outline-none"
                 rows="3"
+                placeholder="Enter Address..."
+                required // Required if new client
               ></textarea>
             </div>
             <div className="space-y-4">
@@ -269,9 +293,12 @@ function NewQuoteContent() {
                 </label>
                 <input
                   type="text"
-                  readOnly
                   value={formData.clientGst}
-                  className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-600"
+                  onChange={(e) =>
+                    setFormData({ ...formData, clientGst: e.target.value })
+                  }
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-800 focus:ring-2 focus:ring-blue-100 outline-none"
+                  placeholder="Enter GST..."
                 />
               </div>
               <div>
@@ -317,7 +344,6 @@ function NewQuoteContent() {
                 key={index}
                 className="flex flex-col gap-4 p-4 bg-slate-50/50 rounded-xl border border-slate-100"
               >
-                {/* Row 1: Product Search & Basic Specs */}
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="w-full md:w-1/3">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
@@ -384,11 +410,10 @@ function NewQuoteContent() {
                   </div>
                 </div>
 
-                {/* Row 2: Description, Qty, Rate, Total */}
                 <div className="flex flex-col md:flex-row gap-4 items-end">
                   <div className="flex-grow">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
-                      Description / Notes
+                      Description
                     </label>
                     <input
                       type="text"
@@ -451,7 +476,6 @@ function NewQuoteContent() {
             ))}
           </div>
 
-          {/* Grand Totals */}
           <div className="mt-6 flex justify-end">
             <div className="w-64 space-y-2 border-t border-slate-200 pt-4">
               <div className="flex justify-between text-sm text-slate-500">
@@ -526,7 +550,6 @@ function NewQuoteContent() {
           </div>
         </div>
 
-        {/* Submit Button */}
         <div className="bottom-4 z-10">
           <button
             type="submit"
@@ -534,7 +557,7 @@ function NewQuoteContent() {
             className="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl shadow-xl hover:bg-black transition-all active:scale-[0.99] flex justify-center items-center gap-2"
           >
             {loading ? (
-              "Generating Quote..."
+              "Processing..."
             ) : (
               <>
                 <FiSave size={20} /> Generate Quotation PDF
@@ -547,10 +570,13 @@ function NewQuoteContent() {
   );
 }
 
-// 🟢 2. MAIN PAGE: Wraps content in Suspense to fix Build Error
 export default function NewQuotePage() {
   return (
-    <Suspense fallback={<div className="p-10 text-center text-slate-400">Loading Quotation Form...</div>}>
+    <Suspense
+      fallback={
+        <div className="p-10 text-center text-slate-400">Loading...</div>
+      }
+    >
       <NewQuoteContent />
     </Suspense>
   );
