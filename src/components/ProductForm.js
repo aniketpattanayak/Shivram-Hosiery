@@ -6,7 +6,6 @@ import {
 import { FaRupeeSign } from "react-icons/fa";
 import api from '@/utils/api';
 
-// 🟢 ACCEPT 'initialData' PROP
 export default function ProductForm({ onClose, onSuccess, initialData = null }) {
   
   // --- STATE ---
@@ -16,8 +15,10 @@ export default function ProductForm({ onClose, onSuccess, initialData = null }) 
   const [colors, setColors] = useState([]);
   const [availableSubCats, setAvailableSubCats] = useState([]);
   
-  const [showModal, setShowModal] = useState(null);
+  // 🟢 NEW: Quick Add States
+  const [showModal, setShowModal] = useState(null); // 'CATEGORY', 'SUBCAT', 'FABRIC', 'COLOR'
   const [newItemValue, setNewItemValue] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "", sku: "", category: "", subCategory: "", fabricType: "", color: "",
@@ -26,7 +27,7 @@ export default function ProductForm({ onClose, onSuccess, initialData = null }) 
     bom: [],
   });
 
-  // --- FETCH DATA & PRE-FILL ---
+  // --- FETCH DATA ---
   useEffect(() => {
     const init = async () => {
       try {
@@ -40,17 +41,15 @@ export default function ProductForm({ onClose, onSuccess, initialData = null }) 
         setFabrics(attrRes.data.fabric || []);
         setColors(attrRes.data.color || []);
 
-        // 🟢 PRE-FILL LOGIC IF EDITING
         if (initialData) {
-            // Transform BOM: Backend sends populated objects, we need IDs for the Select inputs
             const formattedBom = (initialData.bom || []).map(b => ({
-                material: b.material._id || b.material, // Handle if populated or not
+                material: b.material?._id || b.material, 
                 qtyRequired: b.qtyRequired
             }));
 
             setFormData({
                 name: initialData.name || "",
-                sku: initialData.idDisplay || initialData.sku || "", // Handle mapped vs raw
+                sku: initialData.idDisplay || initialData.sku || "",
                 category: initialData.category || "",
                 subCategory: initialData.subCategory || "",
                 fabricType: initialData.fabricType || "",
@@ -63,21 +62,17 @@ export default function ProductForm({ onClose, onSuccess, initialData = null }) 
                 bom: formattedBom
             });
 
-            // Trigger SubCat population if category exists
             if (initialData.category) {
                 const selectedCat = catRes.data.find(c => c.name === initialData.category);
                 setAvailableSubCats(selectedCat ? selectedCat.subCategories : []);
             }
         }
-
-      } catch (error) {
-        console.error("Error loading master data", error);
-      }
+      } catch (error) { console.error("Error loading master data", error); }
     };
     init();
   }, [initialData]);
 
-  // --- HANDLERS (Keep existing logic) ---
+  // --- HANDLERS ---
   const handleCategoryChange = (e) => {
     const catName = e.target.value;
     const selectedCat = categories.find((c) => c.name === catName);
@@ -85,9 +80,6 @@ export default function ProductForm({ onClose, onSuccess, initialData = null }) 
     setAvailableSubCats(selectedCat ? selectedCat.subCategories : []);
   };
 
-  // ... (Keep handleQuickAdd, addBomItem, updateBom exactly same as before) ...
-  const handleQuickAdd = async () => { /* ... existing logic ... */ setShowModal(null); };
-  
   const addBomItem = () => {
     if (materials.length === 0) return alert("No materials found!");
     setFormData({ ...formData, bom: [...formData.bom, { material: materials[0]?._id, qtyRequired: 1 }] });
@@ -99,17 +91,71 @@ export default function ProductForm({ onClose, onSuccess, initialData = null }) 
     setFormData({ ...formData, bom: newBom });
   };
 
-  // 🟢 UPDATED SUBMIT LOGIC
+  // 🟢 NEW: HANDLE DYNAMIC MASTER ADDITION
+  const handleQuickAdd = async () => {
+    if (!newItemValue.trim()) return;
+    setIsAdding(true);
+
+    try {
+        let response;
+        // 1. ADD NEW CATEGORY
+        if (showModal === 'CATEGORY') {
+            response = await api.post("/master/categories", { name: newItemValue, subCategories: [] });
+            setCategories([...categories, response.data]); 
+            setFormData(prev => ({ ...prev, category: newItemValue, subCategory: "" }));
+            setAvailableSubCats([]);
+        } 
+        
+        // 2. ADD NEW SUB-CATEGORY (Requires Category to be selected first)
+        else if (showModal === 'SUBCAT') {
+            const currentCat = categories.find(c => c.name === formData.category);
+            if (!currentCat) throw new Error("Select a Category first.");
+            
+            // We assume backend has an endpoint to push subcategory, usually a PUT on the category
+            const updatedSubs = [...currentCat.subCategories, newItemValue];
+            await api.put(`/master/categories/${currentCat._id}`, { subCategories: updatedSubs });
+            
+            // Update local state
+            const updatedCats = categories.map(c => c._id === currentCat._id ? { ...c, subCategories: updatedSubs } : c);
+            setCategories(updatedCats);
+            setAvailableSubCats(updatedSubs);
+            setFormData(prev => ({ ...prev, subCategory: newItemValue }));
+        } 
+        
+        // 3. ADD NEW FABRIC OR COLOR (Using Attributes Master)
+        else if (showModal === 'FABRIC' || showModal === 'COLOR') {
+            const type = showModal === 'FABRIC' ? 'fabric' : 'color';
+            // Assuming endpoint accepts { type: 'fabric', value: 'Silk' }
+            await api.post("/master/attributes", { type, value: newItemValue });
+            
+            if (type === 'fabric') {
+                setFabrics([...fabrics, newItemValue]);
+                setFormData(prev => ({ ...prev, fabricType: newItemValue }));
+            } else {
+                setColors([...colors, newItemValue]);
+                setFormData(prev => ({ ...prev, color: newItemValue }));
+            }
+        }
+
+        alert(`${showModal} Added Successfully!`);
+        setShowModal(null);
+        setNewItemValue("");
+
+    } catch (error) {
+        alert("Failed to add: " + (error.response?.data?.msg || error.message));
+    } finally {
+        setIsAdding(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.sku) return alert("SKU is required");
     try {
       if (initialData) {
-        // UPDATE MODE
         await api.put(`/products/${initialData._id}`, formData);
         alert("Product Updated Successfully!");
       } else {
-        // CREATE MODE
         await api.post("/products", formData);
         alert("Product Created Successfully!");
       }
@@ -120,6 +166,7 @@ export default function ProductForm({ onClose, onSuccess, initialData = null }) 
   };
 
   const inputClass = "w-full bg-white border border-slate-300 rounded-xl p-3 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400";
+  const labelClass = "text-xs font-bold text-slate-500 uppercase flex justify-between items-center";
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
@@ -142,47 +189,66 @@ export default function ProductForm({ onClose, onSuccess, initialData = null }) 
         <div className="p-8 overflow-y-auto custom-scrollbar relative">
           <form onSubmit={handleSubmit} className="space-y-6">
             
-            {/* ... (KEEP ALL FORM FIELDS EXACTLY AS THEY WERE IN PREVIOUS STEP) ... */}
-            {/* Just pasting the rows structure here for clarity - no changes needed to inputs */}
-            
             {/* Row 1: Basics */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">Product Name</label>
+                <label className={labelClass}>Product Name</label>
                 <input type="text" className={inputClass} value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">SKU Code</label>
+                <label className={labelClass}>SKU Code</label>
                 <input type="text" className={inputClass} value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} required />
               </div>
             </div>
 
-            {/* Row 2: Dynamic Details */}
+            {/* Row 2: Dynamic Details with Quick Add */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-               {/* ... Keep Category, SubCat, Fabric, Color Inputs same as before ... */}
+               
+               {/* 🟢 CATEGORY */}
                <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">Category</label>
+                <label className={labelClass}>
+                    Category 
+                    <button type="button" onClick={() => setShowModal('CATEGORY')} className="text-blue-600 hover:bg-blue-100 p-1 rounded"><FiPlus/></button>
+                </label>
                 <select className={inputClass} value={formData.category} onChange={handleCategoryChange} required>
                   <option value="">Select Category</option>
                   {categories.map((c) => <option key={c._id} value={c.name}>{c.name}</option>)}
                 </select>
               </div>
+
+              {/* 🟢 SUB-CATEGORY */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">Sub-Category</label>
+                <label className={labelClass}>
+                    Sub-Category
+                    <button type="button" onClick={() => { 
+                        if(!formData.category) return alert("Select Category First"); 
+                        setShowModal('SUBCAT'); 
+                    }} className="text-blue-600 hover:bg-blue-100 p-1 rounded"><FiPlus/></button>
+                </label>
                 <select className={inputClass} value={formData.subCategory} onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })} disabled={!formData.category}>
                   <option value="">Select Sub</option>
                   {availableSubCats.map((sub) => <option key={sub} value={sub}>{sub}</option>)}
                 </select>
               </div>
+
+              {/* 🟢 FABRIC */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">Fabric</label>
+                <label className={labelClass}>
+                    Fabric
+                    <button type="button" onClick={() => setShowModal('FABRIC')} className="text-blue-600 hover:bg-blue-100 p-1 rounded"><FiPlus/></button>
+                </label>
                 <select className={inputClass} value={formData.fabricType} onChange={(e) => setFormData({ ...formData, fabricType: e.target.value })}>
                   <option value="">Select Fabric</option>
                   {fabrics.map((f) => <option key={f} value={f}>{f}</option>)}
                 </select>
               </div>
+
+              {/* 🟢 COLOR */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">Color</label>
+                <label className={labelClass}>
+                    Color
+                    <button type="button" onClick={() => setShowModal('COLOR')} className="text-blue-600 hover:bg-blue-100 p-1 rounded"><FiPlus/></button>
+                </label>
                 <select className={inputClass} value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })}>
                   <option value="">Select Color</option>
                   {colors.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -239,16 +305,30 @@ export default function ProductForm({ onClose, onSuccess, initialData = null }) 
                 <FiSave /> {initialData ? 'Update Product' : 'Save Product Master'}
             </button>
 
-            {/* Quick Add Modal (Nested) */}
+            {/* 🟢 QUICK ADD MODAL */}
             {showModal && (
-                /* ... (Keep existing Quick Add Modal code) ... */
-                <div className="absolute inset-0 bg-white/95 z-[70] flex items-center justify-center rounded-3xl">
+                <div className="absolute inset-0 bg-white/95 z-[70] flex items-center justify-center rounded-3xl animate-in zoom-in-95">
                     <div className="w-full max-w-sm p-6 text-center">
-                        <h3 className="font-bold text-lg mb-4">Add New {showModal}</h3>
-                        <input autoFocus className="w-full p-3 border rounded-xl mb-4" value={newItemValue} onChange={(e) => setNewItemValue(e.target.value)} />
+                        <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <FiPlus size={24} />
+                        </div>
+                        <h3 className="font-bold text-lg text-slate-900 mb-2">
+                            Add New {showModal === 'SUBCAT' ? 'Sub-Category' : showModal.charAt(0) + showModal.slice(1).toLowerCase()}
+                        </h3>
+                        {showModal === 'SUBCAT' && <p className="text-xs text-slate-500 mb-4">Adding to: <strong>{formData.category}</strong></p>}
+                        
+                        <input 
+                            autoFocus 
+                            className="w-full p-3 border border-slate-300 rounded-xl mb-4 font-bold text-center focus:ring-2 focus:ring-blue-500 outline-none" 
+                            placeholder={`Enter Name...`}
+                            value={newItemValue} 
+                            onChange={(e) => setNewItemValue(e.target.value)} 
+                        />
                         <div className="flex gap-2">
-                            <button type="button" onClick={() => setShowModal(null)} className="flex-1 py-3 bg-slate-100 font-bold rounded-xl">Cancel</button>
-                            <button type="button" onClick={handleQuickAdd} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl">Add</button>
+                            <button type="button" onClick={() => { setShowModal(null); setNewItemValue(""); }} className="flex-1 py-3 bg-slate-100 font-bold rounded-xl text-slate-500 hover:bg-slate-200">Cancel</button>
+                            <button type="button" disabled={isAdding} onClick={handleQuickAdd} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg">
+                                {isAdding ? "Saving..." : "Save & Select"}
+                            </button>
                         </div>
                     </div>
                 </div>
