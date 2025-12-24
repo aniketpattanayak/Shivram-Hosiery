@@ -52,9 +52,8 @@ export const SYSTEM_MODULES = [
     key: "manufacturing", 
     items: [
       { name: "Production Plan", href: "/production", icon: FiScissors },
-      // 🟢 ADDED KITTING HERE
       { name: "Full Kitting", href: "/kitting", icon: FiPackage, key: "production" }, 
-      { name: "Shop Floor", href: "/shop-floor", icon: FiPlay },
+      { name: "Production Floor", href: "/shop-floor", icon: FiPlay },
       { name: "Quality Control", href: "/qc", icon: FiSettings },
     ]
   },

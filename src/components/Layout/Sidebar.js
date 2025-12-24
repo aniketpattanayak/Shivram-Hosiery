@@ -76,11 +76,11 @@ export default function Sidebar() {
     <div className="w-64 bg-white flex flex-col h-screen border-r border-slate-200 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 print:hidden fixed left-0 top-0">
       
       {/* Brand Header */}
-      <div className="h-16 flex items-center justify-center border-b border-slate-100 bg-white">
-        <h1 className="text-xl font-extrabold text-slate-800 tracking-wider">
-          Shivram H<span className="text-blue-600">os</span>iery
-        </h1>
-      </div>
+      <div className="h-16 flex items-center justify-center border-b border-slate-100 bg-white px-4">
+  <h1 className="text-xl font-extrabold text-slate-800 tracking-wider text-center w-full">
+    Shivram Hosiery <span className="text-blue-600">Factory</span>
+  </h1>
+</div>
 
       <nav className="flex-1 overflow-y-auto py-6 space-y-1 px-3 custom-scrollbar">
         

@@ -1,24 +1,34 @@
 // frontend/src/app/production/StrategyModal.js
 'use client';
 import { useState, useEffect } from 'react';
-import { FiX, FiPlus, FiTrash2, FiSave } from 'react-icons/fi';
+import { FiX, FiPlus, FiTrash2, FiSave, FiAlertCircle } from 'react-icons/fi';
 import api from '@/utils/api';
 
 export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggregatedPlans }) {
-  // 🟢 CALCULATE LIMITS FOR PARTIAL PLANNING
+  // 🟢 CALCULATE OPTIMAL PLANNING LIMITS
   const totalOrder = plan.totalQtyToMake;
   const alreadyPlanned = plan.plannedQty || 0;
-  // If global, use aggregated unplanned, otherwise calc single
-  const remainingToPlan = isGlobal ? plan.unplannedQty : (totalOrder - alreadyPlanned);
+  const alreadyDispatched = plan.dispatchedQty || 0;
+  
+  // Remaining for this specific order
+  const remainingForOrder = isGlobal ? plan.unplannedQty : (totalOrder - alreadyPlanned - alreadyDispatched);
+
+  // Math for Inventory Health (Refill)
+  const currentStock = plan.product?.stock?.warehouse || 0;
+  const targetStock = plan.product?.stockAtLeast || 0;
+  const refillNeeded = Math.max(0, targetStock - currentStock);
+
+  // 🟢 NEW LIMIT: Order Needs + Inventory Health Needs
+  const maxSuggestedToPlan = remainingForOrder + refillNeeded;
 
   const [loading, setLoading] = useState(false);
   const [vendors, setVendors] = useState([]);
   
-  // 🟢 INITIAL SPLIT QTY = REMAINING
+  // 🟢 INITIAL SPLIT QTY = Suggested Total (Order + Refill)
   const [splits, setSplits] = useState([
     { 
       id: "init-1", 
-      qty: remainingToPlan, // Default to remaining
+      qty: maxSuggestedToPlan, 
       mode: 'Manufacturing', 
       routing: {
         cutting: { type: 'In-House', vendorName: '' },
@@ -32,7 +42,7 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const res = await api.get('/vendors'); 
+        const res = await api.get('/procurement/vendors'); 
         setVendors(res.data);
       } catch (e) { console.error(e); }
     };
@@ -44,12 +54,12 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
 
   const addSplit = () => {
     const used = splits.reduce((acc, s) => acc + (Number(s.qty) || 0), 0);
-    const remaining = remainingToPlan - used;
-    if (remaining <= 0) return alert("All remaining quantity is already assigned.");
-
+    const remaining = maxSuggestedToPlan - used;
+    
+    // We allow adding splits as long as we stay within suggested limits
     setSplits([...splits, {
       id: `split-${Date.now()}-${Math.random()}`, 
-      qty: remaining,
+      qty: remaining > 0 ? remaining : 0,
       mode: 'Manufacturing',
       routing: {
         cutting: { type: 'In-House', vendorName: '' },
@@ -86,12 +96,12 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
     setSplits(splits.map(s => s.id === id ? { ...s, trading: { ...s.trading, [field]: value } } : s));
   };
 
-  // 🟢 VALIDATION: Must not exceed REMAINING, but CAN be less
+  // 🟢 UPDATED VALIDATION: Allow planning up to Suggested (Order + Refill)
   const totalAssigned = splits.reduce((acc, s) => acc + (Number(s.qty) || 0), 0);
-  const isValid = totalAssigned > 0 && totalAssigned <= remainingToPlan;
+  const isValid = totalAssigned > 0 && totalAssigned <= maxSuggestedToPlan;
 
   const handleSubmit = async () => {
-    if(!isValid) return alert(`Total assigned (${totalAssigned}) cannot exceed Remaining (${remainingToPlan})`);
+    if(!isValid) return alert(`Total assigned (${totalAssigned}) cannot exceed the Suggested Plan (${maxSuggestedToPlan})`);
     
     setLoading(true);
     try {
@@ -114,12 +124,7 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
 
       const payload = { planId: plan._id, splits: formattedSplits };
 
-      // Backend now handles partials automatically
       if (isGlobal && aggregatedPlans?.length) {
-         // Note: Global partials are complex, backend will distribute or error.
-         // For now we map to the first plan or send array if backend supports it.
-         // Assuming single plan focus for this partial update based on previous context.
-         // If global, we might just send the array of IDs.
          await api.post('/production/confirm-strategy', { ...payload, planIds: aggregatedPlans.map(p => p._id) });
       } else {
          await api.post('/production/confirm-strategy', payload);
@@ -139,26 +144,40 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
         <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div>
             <h3 className="text-xl font-bold text-slate-800">Production Split Strategy</h3>
-            <p className="text-xs text-slate-500 mt-1">Split quantity across different vendors or methods.</p>
+            <p className="text-xs text-slate-500 mt-1">Plan for order fulfillment and inventory health.</p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-full"><FiX size={20} /></button>
         </div>
 
-        {/* 🟢 STATS HEADER */}
-        <div className="grid grid-cols-3 gap-4 p-6 bg-blue-50 border-b border-blue-100">
+        {/* 🟢 UPDATED STATS HEADER WITH REFILL LOGIC */}
+        <div className="grid grid-cols-4 gap-4 p-6 bg-blue-50 border-b border-blue-100">
             <div>
-                <p className="text-xs font-bold text-slate-400 uppercase">Total Order</p>
-                <p className="text-xl font-black text-slate-800">{totalOrder}</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Order Pending</p>
+                <p className="text-xl font-black text-slate-800">{remainingForOrder}</p>
             </div>
             <div>
-                <p className="text-xs font-bold text-slate-400 uppercase">Already Planned</p>
-                <p className="text-xl font-bold text-blue-600">{alreadyPlanned}</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Refill Needed</p>
+                <p className="text-xl font-bold text-purple-600">+{refillNeeded}</p>
             </div>
-            <div>
-                <p className="text-xs font-bold text-slate-400 uppercase">Remaining to Plan</p>
-                <p className="text-xl font-black text-red-600">{remainingToPlan}</p>
+            <div className="bg-white/50 p-2 rounded-lg border border-blue-100">
+                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-tight text-center">Suggested Plan</p>
+                <p className="text-2xl font-black text-blue-700 text-center">{maxSuggestedToPlan}</p>
+            </div>
+            <div className="flex flex-col justify-center">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Assigned Now</p>
+                <p className={`text-xl font-black ${totalAssigned > maxSuggestedToPlan ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {totalAssigned}
+                </p>
             </div>
         </div>
+
+        {/* 🟢 OVER-PLANNING WARNING */}
+        {totalAssigned > remainingForOrder && (
+            <div className="px-6 py-2 bg-amber-50 border-b border-amber-100 flex items-center gap-2 text-amber-700 text-xs font-bold">
+                <FiAlertCircle /> 
+                <span>Note: You are planning {totalAssigned - remainingForOrder} units extra for warehouse stock.</span>
+            </div>
+        )}
 
         <div className="p-6 overflow-y-auto flex-grow bg-slate-50/50">
             <div className="space-y-4">
@@ -240,7 +259,7 @@ export default function StrategyModal({ plan, onClose, onSuccess, isGlobal, aggr
                         </div>
                     </div>
                 ))}
-                <button onClick={addSplit} disabled={totalAssigned >= remainingToPlan} className="w-full py-3 border-2 border-dashed border-slate-300 text-slate-400 font-bold rounded-xl hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><FiPlus /> Add Another Split</button>
+                <button onClick={addSplit} disabled={totalAssigned >= maxSuggestedToPlan} className="w-full py-3 border-2 border-dashed border-slate-300 text-slate-400 font-bold rounded-xl hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><FiPlus /> Add Another Split</button>
             </div>
         </div>
 
