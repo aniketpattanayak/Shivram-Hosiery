@@ -13,14 +13,18 @@ export default function InventoryPage() {
   
   const [modalMode, setModalMode] = useState('NONE'); 
   const [selectedRecipeProduct, setSelectedRecipeProduct] = useState(null);
+  
+  // 🟢 Edit States
   const [editingProduct, setEditingProduct] = useState(null);
+  const [editingMaterial, setEditingMaterial] = useState(null); // New State for RM
+  
   const [viewStockItem, setViewStockItem] = useState(null);
 
   const [rawMaterials, setRawMaterials] = useState([]);
   const [products, setProducts] = useState([]);
   const [filterType, setFilterType] = useState("ALL");
   const [filterHealth, setFilterHealth] = useState("ALL");
-  const [searchQuery, setSearchQuery] = useState(""); // 🟢 Added search state
+  const [searchQuery, setSearchQuery] = useState(""); 
 
   useEffect(() => { fetchStock(); }, []);
 
@@ -79,11 +83,11 @@ export default function InventoryPage() {
         };
     });
 
-    // 🟢 Apply Filters
+    // Filters
     if (filterType !== 'ALL') combined = combined.filter(i => (filterType === 'RM' ? i.type === 'Raw Material' : i.type === 'Finished Good'));
     if (filterHealth !== 'ALL') combined = combined.filter(i => i.status === filterHealth);
     
-    // 🟢 Apply Search Filter
+    // Search Filter
     if (searchQuery.trim() !== "") {
         const query = searchQuery.toLowerCase();
         combined = combined.filter(i => 
@@ -110,6 +114,18 @@ export default function InventoryPage() {
       setModalMode('ADD_FG'); 
   };
 
+  // 🟢 NEW: Handle Edit Material
+  const handleEditMaterial = (material) => {
+      setEditingMaterial(material.original);
+      setModalMode('ADD_RM');
+  };
+
+  // 🟢 NEW: Close Handler to reset edit state
+  const handleCloseRMModal = () => {
+      setModalMode('NONE');
+      setEditingMaterial(null);
+  };
+
   return (
     <AuthGuard requiredPermission="inventory">
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -131,7 +147,7 @@ export default function InventoryPage() {
                 {recalcLoading ? "Fixing Data..." : "Refresh Health"}
             </button>
 
-            <button onClick={() => { setEditingProduct(null); setModalMode('SELECTION'); }} className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
+            <button onClick={() => { setEditingProduct(null); setEditingMaterial(null); setModalMode('SELECTION'); }} className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
                 <FiPlus /> Add Item
             </button>
         </div>
@@ -139,7 +155,7 @@ export default function InventoryPage() {
 
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-end gap-6">
         <div className="flex flex-col md:flex-row gap-6 w-full lg:w-auto">
-            {/* 🟢 Search Filter UI */}
+            {/* Search Filter UI */}
             <div className="w-full md:w-64">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Search Item</label>
                 <div className="relative">
@@ -194,8 +210,15 @@ export default function InventoryPage() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                         <div className="font-bold text-slate-800">{item.name}</div>
+                        {/* 🟢 Finished Good Edit */}
                         {item.type === 'Finished Good' && (
                             <button onClick={() => handleEditProduct(item)} className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded hover:bg-blue-50" title="Edit Product">
+                                <FiEdit3 size={14} />
+                            </button>
+                        )}
+                        {/* 🟢 NEW: Raw Material Edit */}
+                        {item.type === 'Raw Material' && (
+                            <button onClick={() => handleEditMaterial(item)} className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded hover:bg-blue-50" title="Edit Material">
                                 <FiEdit3 size={14} />
                             </button>
                         )}
@@ -285,7 +308,15 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {modalMode === 'ADD_RM' && <AddMaterialModal onClose={() => setModalMode('NONE')} onSuccess={() => { setModalMode('NONE'); fetchStock(); }} />}
+      {/* 🟢 NEW: Pass initialData to AddMaterialModal for editing */}
+      {modalMode === 'ADD_RM' && (
+        <AddMaterialModal 
+            initialData={editingMaterial} 
+            onClose={handleCloseRMModal} 
+            onSuccess={() => { handleCloseRMModal(); fetchStock(); }} 
+        />
+      )}
+      
       {modalMode === 'ADD_FG' && <ProductForm initialData={editingProduct} onClose={() => { setModalMode('NONE'); setEditingProduct(null); }} onSuccess={() => { setModalMode('NONE'); setEditingProduct(null); fetchStock(); }} />}
       {selectedRecipeProduct && <ViewRecipeModal product={selectedRecipeProduct} onClose={() => setSelectedRecipeProduct(null)} />}
       

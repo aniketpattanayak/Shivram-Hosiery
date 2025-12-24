@@ -1,10 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
-import axios from "axios";
-import { FiX, FiSave, FiPlus } from "react-icons/fi";
+import { FiX, FiSave, FiPlus, FiEdit3 } from "react-icons/fi";
 import api from '@/utils/api';
 
-export default function AddMaterialModal({ onClose, onSuccess }) {
+export default function AddMaterialModal({ onClose, onSuccess, initialData }) {
   // 🟢 Form Data State
   const [formData, setFormData] = useState({
     materialId: "",
@@ -15,7 +14,7 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
     costPerUnit: 0,
     openingStock: 0,
     batchNumber: "",
-    // 🟢 NEW FIELDS: PLANNING METRICS
+    // Planning Metrics
     avgConsumption: 0,
     leadTime: 0,
     safetyStock: 0,
@@ -35,11 +34,29 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
     fetchAttributes();
   }, []);
 
+  // 🟢 2. PRE-FILL FORM IF EDITING
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        materialId: initialData.materialId || "",
+        name: initialData.name || "",
+        materialType: initialData.materialType || "",
+        unit: initialData.unit || "",
+        // Access nested stock properties safely
+        reorderLevel: initialData.stock?.reorderLevel || 100,
+        costPerUnit: initialData.costPerUnit || 0,
+        openingStock: initialData.stock?.current || 0, 
+        batchNumber: "", // Batch number is usually not editable in master update
+        avgConsumption: initialData.avgConsumption || 0,
+        leadTime: initialData.leadTime || 0,
+        safetyStock: initialData.safetyStock || 0,
+      });
+    }
+  }, [initialData]);
+
   const fetchAttributes = async () => {
     try {
-      const res = await api.get(
-        "/master/attributes"
-      );
+      const res = await api.get("/master/attributes");
       const allAttrs = res.data;
       setMaterialTypes(allAttrs.materialType || ["Fabric", "Thread"]);
       setUnits(allAttrs.unit || ["MTR", "KG", "PCS"]);
@@ -48,17 +65,14 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
     }
   };
 
-  // 2. Handle Quick Add Submission
+  // Handle Quick Add Submission
   const handleQuickAddSubmit = async () => {
     if (!newItemValue.trim()) return;
     try {
-      const res = await api.post(
-        "/master/attributes",
-        {
-          type: showQuickAdd,
-          value: newItemValue,
-        }
-      );
+      const res = await api.post("/master/attributes", {
+        type: showQuickAdd,
+        value: newItemValue,
+      });
 
       if (showQuickAdd === "materialType") {
         setMaterialTypes([...materialTypes, res.data.value]);
@@ -82,24 +96,24 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
   // 3. Handle Main Form Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (
-      !formData.materialId ||
-      !formData.name ||
-      !formData.materialType ||
-      !formData.unit
-    ) {
+    if (!formData.materialId || !formData.name || !formData.materialType || !formData.unit) {
       return alert("Please fill all required fields");
     }
 
     setLoading(true);
     try {
-      await api.post(
-        "/inventory/materials",
-        formData
-      );
+      if (initialData) {
+        // 🟢 UPDATE MODE (PUT)
+        await api.put(`/inventory/${initialData._id}`, formData);
+        alert("✅ Material Updated Successfully!");
+      } else {
+        // 🟢 CREATE MODE (POST)
+        await api.post("/inventory/materials", formData);
+        alert("✅ Material Added Successfully!");
+      }
       onSuccess();
     } catch (error) {
-      alert(error.response?.data?.msg || "Error adding material");
+      alert(error.response?.data?.msg || "Error processing material");
     } finally {
       setLoading(false);
     }
@@ -110,7 +124,13 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
       {/* MAIN MODAL */}
       <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden border border-slate-100 relative">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <h3 className="font-bold text-slate-800">Add Raw Material</h3>
+          <div>
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              {initialData ? <FiEdit3 className="text-blue-500" /> : <FiPlus className="text-emerald-500" />}
+              {initialData ? "Edit Raw Material" : "Add Raw Material"}
+            </h3>
+            {initialData && <p className="text-xs text-slate-400 font-mono mt-1">{initialData.materialId}</p>}
+          </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600"
@@ -127,13 +147,12 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
                 Material ID
               </label>
               <input
-                className="w-full border-slate-200 bg-slate-50 rounded-lg p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none mt-1"
+                className={`w-full border-slate-200 rounded-lg p-3 text-sm font-bold outline-none mt-1 ${initialData ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-blue-500'}`}
                 placeholder="RM-001"
                 value={formData.materialId}
-                onChange={(e) =>
-                  setFormData({ ...formData, materialId: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, materialId: e.target.value })}
                 required
+                disabled={!!initialData} // 🟢 Lock ID on Edit
               />
             </div>
             <div className="col-span-2">
@@ -144,9 +163,7 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
                 className="w-full border-slate-200 rounded-lg p-3 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none mt-1"
                 placeholder="e.g. Red Cotton Fabric"
                 value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
               />
             </div>
@@ -170,16 +187,12 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
               <select
                 className="w-full border-slate-200 rounded-lg p-3 text-sm mt-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                 value={formData.materialType}
-                onChange={(e) =>
-                  setFormData({ ...formData, materialType: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, materialType: e.target.value })}
                 required
               >
                 <option value="">Select Type</option>
                 {materialTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
+                  <option key={t} value={t}>{t}</option>
                 ))}
               </select>
             </div>
@@ -199,62 +212,46 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
               <select
                 className="w-full border-slate-200 rounded-lg p-3 text-sm mt-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                 value={formData.unit}
-                onChange={(e) =>
-                  setFormData({ ...formData, unit: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                 required
               >
                 <option value="">Select Unit</option>
                 {units.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
+                  <option key={u} value={u}>{u}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* 🟢 NEW ROW 3: PLANNING METRICS (Consumption, Lead Time, Safety) */}
+          {/* Row 3: Planning Metrics */}
           <div className="grid grid-cols-3 gap-4 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
             <div>
-              <label className="text-xs font-bold text-blue-700 uppercase tracking-wide">
-                Avg. Consump.
-              </label>
+              <label className="text-xs font-bold text-blue-700 uppercase tracking-wide">Avg. Consump.</label>
               <input
                 type="number"
                 className="w-full border-blue-200 rounded-lg p-2 text-sm mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                 value={formData.avgConsumption}
-                onChange={(e) =>
-                  setFormData({ ...formData, avgConsumption: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, avgConsumption: e.target.value })}
                 placeholder="Daily Qty"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-blue-700 uppercase tracking-wide">
-                Lead Time
-              </label>
+              <label className="text-xs font-bold text-blue-700 uppercase tracking-wide">Lead Time</label>
               <input
                 type="number"
                 className="w-full border-blue-200 rounded-lg p-2 text-sm mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                 value={formData.leadTime}
-                onChange={(e) =>
-                  setFormData({ ...formData, leadTime: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, leadTime: e.target.value })}
                 placeholder="Days"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-blue-700 uppercase tracking-wide">
-                Safety Stock
-              </label>
+              <label className="text-xs font-bold text-blue-700 uppercase tracking-wide">Safety Stock</label>
               <input
                 type="number"
                 className="w-full border-blue-200 rounded-lg p-2 text-sm mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                 value={formData.safetyStock}
-                onChange={(e) =>
-                  setFormData({ ...formData, safetyStock: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, safetyStock: e.target.value })}
                 placeholder="Buffer Qty"
               />
             </div>
@@ -262,45 +259,44 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
 
           {/* Row 4: Opening Stock & Cost */}
           <div className="grid grid-cols-3 gap-4">
+            {/* Opening Stock (Editable but handled carefully) */}
             <div>
               <label className="text-xs font-bold text-emerald-600 uppercase tracking-wide">
-                Opening Stock
+                {initialData ? "Current Stock" : "Opening Stock"}
               </label>
               <input
                 type="number"
                 className="w-full border-emerald-200 bg-emerald-50 rounded-lg p-3 text-sm font-bold text-emerald-900 mt-1 focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={formData.openingStock}
-                onChange={(e) =>
-                  setFormData({ ...formData, openingStock: e.target.value })
-                }
+                // Allow editing stock on create, or manual adjustment on edit (optional)
+                onChange={(e) => setFormData({ ...formData, openingStock: e.target.value })}
                 placeholder="0"
+                disabled={!!initialData} // 🟢 Disable stock editing directly here to avoid sync issues, better to use adjustments
               />
             </div>
+            
+            {/* Batch Number (Only for new) */}
             <div>
               <label className="text-xs font-bold text-emerald-600 uppercase tracking-wide">
                 Batch / Lot No.
               </label>
               <input
                 type="text"
-                className="w-full border-emerald-200 bg-emerald-50 rounded-lg p-3 text-sm font-bold text-emerald-900 mt-1 focus:ring-2 focus:ring-emerald-500 outline-none"
+                className={`w-full border-emerald-200 rounded-lg p-3 text-sm font-bold text-emerald-900 mt-1 outline-none ${initialData ? 'bg-slate-100 text-slate-400' : 'bg-emerald-50 focus:ring-2 focus:ring-emerald-500'}`}
                 value={formData.batchNumber}
-                onChange={(e) =>
-                  setFormData({ ...formData, batchNumber: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, batchNumber: e.target.value })}
                 placeholder="e.g. OPENING-01"
+                disabled={!!initialData} // 🟢 Disable on edit
               />
             </div>
+            
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                Cost Per Unit
-              </label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Cost Per Unit</label>
               <input
                 type="number"
                 className="w-full border-slate-200 rounded-lg p-3 text-sm font-semibold mt-1 focus:ring-2 focus:ring-blue-500 outline-none"
                 value={formData.costPerUnit}
-                onChange={(e) =>
-                  setFormData({ ...formData, costPerUnit: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, costPerUnit: e.target.value })}
                 placeholder="0.00"
               />
             </div>
@@ -314,7 +310,7 @@ export default function AddMaterialModal({ onClose, onSuccess }) {
               "Saving..."
             ) : (
               <>
-                <FiSave /> Save Material
+                <FiSave /> {initialData ? "Update Material" : "Save Material"}
               </>
             )}
           </button>
