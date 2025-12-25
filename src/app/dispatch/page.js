@@ -147,11 +147,11 @@ export default function LogisticsPage() {
                             <p className="text-sm font-bold text-slate-500 mt-1">Original for Recipient</p>
                         </div>
                         <div className="text-right">
-                            <h2 className="text-xl font-bold">Shivram Hosiery</h2>
+                            <h2 className="text-xl font-bold">Shivram Hosiery Factory</h2>
                             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                Plot No 45, Industrial Area,<br/>
-                                Mumbai, Maharashtra - 400001<br/>
-                                GSTIN: 27ABCDE1234F1Z5
+                                
+                            Ludhiana <br/>
+                                GSTIN: 03AFEPA1102L1ZB
                             </p>
                         </div>
                     </div>
