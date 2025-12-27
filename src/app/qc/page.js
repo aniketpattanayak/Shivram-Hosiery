@@ -67,41 +67,44 @@ export default function QualityPage() {
   }, [formData.sampleSize, formData.qtyRejected, selectedJob]);
 
 
-  const handleSubmit = async () => {
-    const sample = Number(formData.sampleSize);
-    const rejected = Number(formData.qtyRejected);
+  // ... existing imports
 
-    if (!sample || sample <= 0) return alert("Please enter a valid Sample Size");
-    if (rejected > sample) return alert("Rejected quantity cannot be more than Sample Size!");
+const handleSubmit = async () => {
+  const sample = Number(formData.sampleSize);
+  const rejected = Number(formData.qtyRejected);
 
-    // 🟢 Custom Confirmation Message
-    let confirmMsg = `Confirm QC Results?\n\n• Inspector: ${inspectorName}`;
-    if (stats.isHold) {
-        confirmMsg += `\n\n⚠️ WARNING: DEFECT RATE IS ${stats.defectRate}% (>= 20%).\nThis batch will be put on QC HOLD and NO STOCK will be added.`;
-    } else {
-        confirmMsg += `\n• Approved Stock to Add: ${stats.projectedPass} units`;
-    }
+  if (!sample || sample <= 0) return alert("Please enter a valid Sample Size");
+  
+  // 🟢 ENFORCE RULE: Determine Status based on Threshold
+  const finalStatus = stats.isHold ? "QC_HOLD" : "Pass";
+  const verifiedQty = stats.isHold ? 0 : stats.projectedPass;
 
-    if(!confirm(confirmMsg)) return;
+  let confirmMsg = `Confirm QC Results?\n\n• Inspector: ${inspectorName}`;
+  if (stats.isHold) {
+      confirmMsg += `\n\n⚠️ CRITICAL: DEFECT RATE IS ${stats.defectRate}% (>= 20%).\nThis batch will be put on QC HOLD and NO STOCK will be added to Warehouse.`;
+  } else {
+      confirmMsg += `\n• Approved Stock to Add: ${verifiedQty} units`;
+  }
 
-    try {
-      const res = await api.post("/quality/submit", {
-        jobId: selectedJob.jobId,
-        sampleSize: sample,
-        qtyRejected: rejected,
-        notes: formData.notes
-      });
+  if(!confirm(confirmMsg)) return;
 
-      // 🟢 Show specific success/warning message from backend
-      alert(res.data.msg);
+  try {
+    // 🔗 Calling the Verification Endpoint we built in Phase 4
+    const res = await api.post("/shopfloor/receive-v2", {
+      jobId: selectedJob.jobId,
+      finalQty: verifiedQty, 
+      qcStatus: finalStatus, // 🟢 Sends 'QC_HOLD' if >= 20%
+      remarks: formData.notes + ` (Defect Rate: ${stats.defectRate}%)`
+    });
 
-      setSelectedJob(null);
-      setFormData({ sampleSize: "", qtyRejected: "", notes: "" });
-      fetchPendingJobs();
-    } catch (error) {
-      alert("Error: " + (error.response?.data?.msg || error.message));
-    }
-  };
+    alert(res.data.msg);
+    setSelectedJob(null);
+    setFormData({ sampleSize: "", qtyRejected: "", notes: "" });
+    fetchPendingJobs();
+  } catch (error) {
+    alert("Error: " + (error.response?.data?.msg || error.message));
+  }
+};
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto min-h-screen bg-white">

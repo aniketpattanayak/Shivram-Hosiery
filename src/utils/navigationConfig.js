@@ -2,7 +2,8 @@
 import {
   FiGrid, FiShoppingCart, FiScissors, FiBox, FiTruck, FiSettings, FiPlay, FiLayers, 
   FiPieChart, FiUserCheck, FiFileText, FiCreditCard, FiPlusSquare, FiActivity, FiTool,
-  FiPackage, FiZap // 🟢 Ensure FiZap is imported
+  FiPackage, FiZap, 
+  FiHome, FiClipboard, FiTrendingUp // 🟢 Added FiTrendingUp for the report
 } from "react-icons/fi";
 import { PiDress } from "react-icons/pi";
 
@@ -42,7 +43,6 @@ export const SYSTEM_MODULES = [
     items: [
       { name: "Purchase Orders", href: "/procurement", icon: FiBox },
       { name: "Receive Stock", href: "/receive", icon: FiTruck },
-      // 🟢 ADDED HERE (After Receive Stock)
       { name: "Direct Stock (No PO)", href: "/direct-entry", icon: FiZap, key: "procurement" },
     ]
   },
@@ -55,6 +55,14 @@ export const SYSTEM_MODULES = [
       { name: "Full Kitting", href: "/kitting", icon: FiPackage, key: "production" }, 
       { name: "Production Floor", href: "/shop-floor", icon: FiPlay },
       { name: "Quality Control", href: "/qc", icon: FiSettings },
+    ]
+  },
+  {
+    groupName: "Vendor Portal",
+    icon: FiHome,
+    key: "vendor_portal", 
+    items: [
+      { name: "My Job Cards", href: "/vendor/jobs", icon: FiClipboard },
     ]
   },
   {
@@ -72,6 +80,8 @@ export const SYSTEM_MODULES = [
     key: "analytics", 
     items: [
       { name: "Reports Center", href: "/reports", icon: FiPieChart },
+      // 🟢 ADDED: Link to the new Accountability Report
+      { name: "Vendor Efficiency", href: "/reports/efficiency", icon: FiTrendingUp }, 
     ]
   }
 ];

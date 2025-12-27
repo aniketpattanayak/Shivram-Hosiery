@@ -226,7 +226,7 @@ export default function AddMaterialModal({ onClose, onSuccess, initialData }) {
           {/* Row 3: Planning Metrics */}
           <div className="grid grid-cols-3 gap-4 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
             <div>
-              <label className="text-xs font-bold text-blue-700 uppercase tracking-wide">Avg. Consump.</label>
+              <label className="text-xs font-bold text-blue-700 uppercase tracking-wide">Avg. Daily Consump.</label>
               <input
                 type="number"
                 className="w-full border-blue-200 rounded-lg p-2 text-sm mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
