@@ -17,12 +17,11 @@ import {
   FiChevronsRight,
   FiList,
   FiCheckSquare,
-  FiShield, // 🟢 New icon for Assembly QC
+  FiShield,
   FiActivity,
   FiBox,
 } from "react-icons/fi";
 
-// 🟢 UPDATED WORKFLOW: Now includes Assembly QC (SFG Gate) and Final QC (FG Gate)
 const WORKFLOW_STEPS = [
   {
     id: "Cutting_Started",
@@ -40,7 +39,7 @@ const WORKFLOW_STEPS = [
   },
   {
     id: "Packaging_Pending",
-    label: "Assembly QC", // 🟢 GATE 1
+    label: "Assembly QC", 
     icon: FiShield,
     color: "blue",
     routeKey: null,
@@ -54,7 +53,7 @@ const WORKFLOW_STEPS = [
   },
   {
     id: "QC_Pending",
-    label: "Final QC", // 🟢 GATE 2
+    label: "Final QC", 
     icon: FiCheckCircle,
     color: "emerald",
     routeKey: null,
@@ -62,17 +61,14 @@ const WORKFLOW_STEPS = [
 ];
 
 export default function ShopFloorPage() {
-  // 🟢 ALL HOOKS MUST BE INSIDE THE COMPONENT BODY
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStage, setFilterStage] = useState("ALL");
 
-  // Stores picking list feedback (History)
   const [pickingFeedback, setPickingFeedback] = useState({});
   const [selectedJob, setSelectedJob] = useState(null);
 
-  // 🟢 NEW: Handshake State moved inside the component
   const [receiveModal, setReceiveModal] = useState({ 
     isOpen: false, 
     jobId: "", 
@@ -102,7 +98,6 @@ export default function ShopFloorPage() {
     }
   };
 
-  // 🟢 NEW: Handshake Submission Logic moved inside the component
   const handleHandshakeSubmit = async () => {
     try {
       const res = await api.post("/procurement/receive-handshake", {
@@ -113,21 +108,20 @@ export default function ShopFloorPage() {
       if (res.data.success) {
         alert("✅ Goods Received Successfully!");
         setReceiveModal({ ...receiveModal, isOpen: false });
-        fetchData(); // Refresh list
+        fetchData(); 
       }
     } catch (error) { 
       alert("Error: " + (error.response?.data?.msg || error.message)); 
     }
   };
 
-  // 🟢 NEW: Action Wrapper to decide between Handshake or Advance
   const triggerAction = (job, action) => {
     if (action.actionType === "HANDSHAKE") {
       setReceiveModal({
         isOpen: true,
         jobId: job.jobId,
         expectedQty: action.expectedQty,
-        receivedQty: action.expectedQty, // Default to 100%
+        receivedQty: action.expectedQty, 
         stage: job.currentStep,
       });
     } else {
@@ -194,15 +188,13 @@ export default function ShopFloorPage() {
     return WORKFLOW_STEPS[currentIndex + 1].label;
   };
 
-  // 🟢 UPDATED: Logistics Handshake Awareness
   const getActionConfig = (job) => {
-    const { currentStep, logisticsStatus, routing } = job;
+    const { currentStep, logisticsStatus } = job;
   
-    // 🚚 PRIORITY GATE: If the job is moving, we MUST receive it first
     if (logisticsStatus === "In_Transit") {
       return {
         text: "Receive from Vendor",
-        actionType: "HANDSHAKE", // 🟢 This triggers the popup modal
+        actionType: "HANDSHAKE", 
         nextStage: currentStep,
         color: "bg-emerald-600",
         label: "Goods Receipt",
@@ -210,7 +202,6 @@ export default function ShopFloorPage() {
       };
     }
   
-    // Standard workflow logic (Only shows if NOT in transit)
     switch (currentStep) {
       case "Cutting_Pending":
         return { text: "Start Cutting", nextStage: "Cutting_Started", color: "bg-blue-600", label: "Cutting" };
@@ -232,8 +223,13 @@ export default function ShopFloorPage() {
     }
   };
 
+  // 🟢 UPDATED: Filter logic to hide COMPLETED jobs
   const filteredJobs = jobs.filter((job) => {
     if (job.type === "Full-Buy") return false;
+    
+    // 🟢 HIDE COMPLETED JOBS: Once status is 'Completed', they leave the floor
+    if (job.status === "Completed" || job.currentStep === "QC_Completed") return false;
+    
     const matchesSearch = job.jobId.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStage = filterStage === "ALL" || job.currentStep === filterStage;
     return matchesSearch && matchesStage;
@@ -246,7 +242,7 @@ export default function ShopFloorPage() {
         <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Production Floor</h1>
-            <p className="text-slate-500 text-sm font-medium">Managing Assembly (SFG) and Final (FG) Quality Gates.</p>
+            <p className="text-slate-500 text-sm font-medium">Managing Active Production Pipeline.</p>
           </div>
           <div className="relative">
             <FiSearch className="absolute left-3 top-3 text-slate-400" />
@@ -266,12 +262,15 @@ export default function ShopFloorPage() {
             onClick={() => setFilterStage("ALL")}
             className={`flex-shrink-0 px-5 py-3 rounded-2xl border-2 transition-all flex items-center gap-3 ${filterStage === "ALL" ? "bg-slate-900 border-slate-900 text-white shadow-lg" : "bg-white border-slate-100 text-slate-500 hover:border-slate-300"}`}
           >
-            <span className="font-black text-lg">{jobs.filter((j) => j.type !== "Full-Buy").length}</span>
+            {/* 🟢 Count logic updated to exclude completed */}
+            <span className="font-black text-lg">
+              {jobs.filter((j) => j.type !== "Full-Buy" && j.status !== "Completed" && j.currentStep !== "QC_Completed").length}
+            </span>
             <span className="text-[10px] font-bold uppercase tracking-widest">Active</span>
           </button>
           {WORKFLOW_STEPS.map((step) => {
             const count = jobs.filter((j) => {
-              if (j.type === "Full-Buy") return false;
+              if (j.type === "Full-Buy" || j.status === "Completed") return false;
               if (step.id === "Packaging_Pending") return j.currentStep === "QC_Pending" && !j.productionData?.sfgSource?.lotNumber;
               if (step.id === "QC_Pending") return j.currentStep === "QC_Pending" && j.productionData?.sfgSource?.lotNumber;
               return j.currentStep === step.id;
@@ -292,7 +291,6 @@ export default function ShopFloorPage() {
           })}
         </div>
 
-        {/* Pipeline Table */}
         <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm overflow-x-auto">
           <table className="w-full text-left text-sm min-w-[1000px]">
             <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] border-b border-slate-200">
@@ -364,59 +362,46 @@ export default function ShopFloorPage() {
                     </td>
 
                     <td className="p-4 text-right align-top w-80">
-  {/* 🟢 Step 1: Priority Action (Handshake or Stage Advance) */}
-  {action ? (
-    <button
-      onClick={() => triggerAction(job, action)}
-      className={`px-4 py-2 text-white text-[11px] font-black rounded-lg shadow-sm active:scale-95 transition-all ${action.color} mb-2 shadow-lg hover:brightness-110 flex items-center gap-2 ml-auto`}
-    >
-      {action.text}
-      {action.actionType === "HANDSHAKE" ? (
-        <FiBox className="inline" size={14} />
-      ) : (
-        <FiArrowRight className="inline" size={14} />
-      )}
-    </button>
-  ) : (
-    /* 🟢 Step 2: Fallback Status Badges if no action is pending */
-    <>
-      {job.logisticsStatus === "In_Transit" ? (
-        <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-[10px] font-black uppercase inline-flex items-center gap-2 border border-blue-200">
-          <FiActivity className="animate-spin" /> In Transit from Vendor
-        </div>
-      ) : job.status === "QC_Pending" ? (
-        <div className="bg-amber-50 text-amber-700 px-3 py-2 rounded-lg text-[10px] font-black uppercase inline-flex items-center gap-1 border border-amber-200">
-          <FiActivity className="animate-pulse" /> Awaiting QC Check
-        </div>
-      ) : (
-        <span className="text-xs italic text-slate-300">In Process</span>
-      )}
-    </>
-  )}
+                      {action ? (
+                        <button
+                          onClick={() => triggerAction(job, action)}
+                          className={`px-4 py-2 text-white text-[11px] font-black rounded-lg shadow-sm active:scale-95 transition-all ${action.color} mb-2 shadow-lg hover:brightness-110 flex items-center gap-2 ml-auto`}
+                        >
+                          {action.text}
+                          {action.actionType === "HANDSHAKE" ? <FiBox className="inline" size={14} /> : <FiArrowRight className="inline" size={14} />}
+                        </button>
+                      ) : (
+                        <>
+                          {job.logisticsStatus === "In_Transit" ? (
+                            <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-[10px] font-black uppercase inline-flex items-center gap-2 border border-blue-200">
+                              <FiActivity className="animate-spin" /> In Transit from Vendor
+                            </div>
+                          ) : job.status === "QC_Pending" || job.status === "QC_HOLD" ? (
+                            <div className="bg-amber-50 text-amber-700 px-3 py-2 rounded-lg text-[10px] font-black uppercase inline-flex items-center gap-1 border border-amber-200">
+                              <FiActivity className="animate-pulse" /> {job.status === "QC_HOLD" ? "QC Review Needed" : "Awaiting QC Check"}
+                            </div>
+                          ) : (
+                            <span className="text-xs italic text-slate-300">In Process</span>
+                          )}
+                        </>
+                      )}
 
-  {/* 🟢 Step 3: Material History (Preserved) */}
-  {hasHistory && (
-    <div className="text-left mt-2 bg-slate-50 border border-slate-200 rounded-lg p-3 text-[10px] shadow-sm">
-      <div className="font-bold text-slate-600 mb-2 flex items-center gap-1 border-b border-slate-200 pb-1">
-        <FiCheckCircle size={10} /> ISSUED MATERIAL (History)
-      </div>
-      <div className="space-y-1">
-        {job.issuedMaterials.map((item, idx) => (
-          <div
-            key={idx}
-            className="flex justify-between text-slate-500 font-mono text-[9px] bg-white px-2 py-1 rounded border border-slate-100"
-          >
-            <span>{item.materialName}</span>
-            <span>
-              Lot <span className="font-bold text-slate-700">{item.lotNumber}</span>:{" "}
-              <span className="font-bold text-blue-600">{item.qtyIssued}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )}
-</td>
+                      {hasHistory && (
+                        <div className="text-left mt-2 bg-slate-50 border border-slate-200 rounded-lg p-3 text-[10px] shadow-sm">
+                          <div className="font-bold text-slate-600 mb-2 flex items-center gap-1 border-b border-slate-200 pb-1">
+                            <FiCheckCircle size={10} /> ISSUED MATERIAL (History)
+                          </div>
+                          <div className="space-y-1">
+                            {job.issuedMaterials.map((item, idx) => (
+                              <div key={idx} className="flex justify-between text-slate-500 font-mono text-[9px] bg-white px-2 py-1 rounded border border-slate-100">
+                                <span>{item.materialName}</span>
+                                <span>Lot <span className="font-bold text-slate-700">{item.lotNumber}</span>: <span className="font-bold text-blue-600">{item.qtyIssued}</span></span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
@@ -424,77 +409,43 @@ export default function ShopFloorPage() {
           </table>
         </div>
 
-        {/* 🟢 NEW: PHYSICAL RECEIPT MODAL */}
-        {/* 🟢 PHYSICAL RECEIPT MODAL (GATEKEEPER) */}
-{receiveModal.isOpen && (
-  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
-    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-      {/* Modal Header */}
-      <div className="bg-emerald-600 p-6 text-white flex items-center gap-3">
-        <FiBox size={24} />
-        <div>
-          <h2 className="text-xl font-black uppercase tracking-tight">Confirm Physical Receipt</h2>
-          <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mt-1">
-            Job ID: {receiveModal.jobId}
-          </p>
-        </div>
-      </div>
+        {/* PHYSICAL RECEIPT MODAL */}
+        {receiveModal.isOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="bg-emerald-600 p-6 text-white flex items-center gap-3">
+                <FiBox size={24} />
+                <div>
+                  <h2 className="text-xl font-black uppercase tracking-tight">Confirm Physical Receipt</h2>
+                  <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mt-1">Job ID: {receiveModal.jobId}</p>
+                </div>
+              </div>
 
-      {/* Modal Body */}
-      <div className="p-6 space-y-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">
-              Expected from Vendor
-            </label>
-            <div className="text-2xl font-black text-slate-700">
-              {receiveModal.expectedQty} <span className="text-sm">pcs</span>
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Expected from Vendor</label>
+                    <div className="text-2xl font-black text-slate-700">{receiveModal.expectedQty} <span className="text-sm">pcs</span></div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-emerald-600 uppercase mb-1">Actually Received</label>
+                    <input type="number" autoFocus className="w-full p-3 bg-white border-2 border-emerald-100 rounded-xl font-black text-2xl text-emerald-600 focus:border-emerald-500 outline-none transition-all" value={receiveModal.receivedQty} onChange={(e) => setReceiveModal({ ...receiveModal, receivedQty: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl flex items-start gap-3">
+                  <div className="text-amber-500 mt-1">⚠️</div>
+                  <p className="text-[11px] text-amber-800 font-bold leading-relaxed">CRITICAL: Once confirmed, this record is logged and the QC process is unlocked.</p>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => setReceiveModal({ ...receiveModal, isOpen: false })} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all uppercase text-[11px]">Cancel</button>
+                  <button onClick={handleHandshakeSubmit} className="flex-1 py-3 bg-emerald-600 text-white font-black rounded-xl shadow-lg hover:bg-emerald-700 transition-all uppercase text-[11px]">Confirm & Log Receipt</button>
+                </div>
+              </div>
             </div>
           </div>
-          <div>
-            <label className="block text-[10px] font-black text-emerald-600 uppercase mb-1">
-              Actually Received
-            </label>
-            <input
-              type="number"
-              autoFocus
-              className="w-full p-3 bg-white border-2 border-emerald-100 rounded-xl font-black text-2xl text-emerald-600 focus:border-emerald-500 outline-none transition-all"
-              value={receiveModal.receivedQty}
-              onChange={(e) =>
-                setReceiveModal({ ...receiveModal, receivedQty: e.target.value })
-              }
-            />
-          </div>
-        </div>
-
-        {/* Warning Note */}
-        <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl flex items-start gap-3">
-          <div className="text-amber-500 mt-1">⚠️</div>
-          <p className="text-[11px] text-amber-800 font-bold leading-relaxed">
-            CRITICAL: You are verifying that these goods have physically entered the factory premises. 
-            Once confirmed, this record is logged and the QC process is unlocked.
-          </p>
-        </div>
-
-        {/* Modal Actions */}
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={() => setReceiveModal({ ...receiveModal, isOpen: false })}
-            className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all uppercase text-[11px]"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleHandshakeSubmit}
-            className="flex-1 py-3 bg-emerald-600 text-white font-black rounded-xl shadow-lg hover:bg-emerald-700 transition-all uppercase text-[11px]"
-          >
-            Confirm & Log Receipt
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+        )}
 
         {/* CONFIRMATION DIALOG */}
         {confirmDialog.isOpen && (
