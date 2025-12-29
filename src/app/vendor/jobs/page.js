@@ -1,27 +1,20 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "@/utils/api";
 import AuthGuard from "@/components/AuthGuard";
 import {
-  FiPackage,
-  FiTruck,
-  FiX,
-  FiCheckCircle,
-  FiInfo,
-  FiLayers,
+  FiPackage, FiTruck, FiX, FiCheckCircle, FiInfo, FiLayers,
+  FiUser, FiFilter, FiSearch, FiActivity
 } from "react-icons/fi";
 
 export default function VendorSpreadsheetPage() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Modal States
+  const [vendorFilter, setVendorFilter] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
-  const [dispatchData, setDispatchData] = useState({
-    actualQty: "",
-    wastage: "",
-  });
+  const [dispatchData, setDispatchData] = useState({ actualQty: "", wastage: "" });
   const [submitting, setSubmitting] = useState(false);
 
   const fetchMyJobs = async () => {
@@ -29,293 +22,162 @@ export default function VendorSpreadsheetPage() {
       setLoading(true);
       const res = await api.get("/vendors/my-jobs");
       setJobs(res.data);
-    } catch (error) {
-      console.error("Error fetching vendor jobs:", error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchMyJobs();
-  }, []);
+  useEffect(() => { fetchMyJobs(); }, []);
+
+  const uniqueVendors = useMemo(() => {
+    const vendors = jobs.map((j) => j.vendorId?.name).filter(Boolean);
+    return ["ALL", ...new Set(vendors)];
+  }, [jobs]);
+
+  const filteredJobs = useMemo(() => {
+    return jobs.filter((j) => {
+      const matchesVendor = vendorFilter === "ALL" || j.vendorId?.name === vendorFilter;
+      const matchesSearch = j.jobId.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesVendor && matchesSearch;
+    });
+  }, [jobs, vendorFilter, searchQuery]);
 
   const handleDispatch = async (e) => {
     e.preventDefault();
     try {
       setSubmitting(true);
-      await api.post("/vendors/dispatch", {
+      await api.post("/procurement/dispatch-job", {
         jobId: selectedJob.jobId,
-        actualQty: dispatchData.actualQty,
-        wastage: dispatchData.wastage,
-        lotUsed: selectedJob.issuedMaterials?.[0]?.lotNumber || "N/A",
+        actualQty: Number(dispatchData.actualQty) || 0,
+        wastage: Number(dispatchData.wastage) || 0,
       });
       setIsModalOpen(false);
       setDispatchData({ actualQty: "", wastage: "" });
       fetchMyJobs();
-      alert("Work reported successfully!");
-    } catch (error) {
-      alert(error.response?.data?.msg || "Submission failed");
-    } finally {
-      setSubmitting(false);
-    }
+      alert("🚀 Goods Dispatched!");
+    } catch (error) { alert(error.response?.data?.msg || error.message); } finally { setSubmitting(false); }
   };
+
   const handleStageUpdate = async (jobId, stageResult) => {
     try {
-      // This moves the job to the next stage in the database
-      await api.post('/vendors/update-stage', { jobId, stageResult });
-      alert(`Success: ${stageResult.replace('_', ' ')}`);
-      fetchMyJobs(); // Refresh the list
-    } catch (error) {
-      alert("Error updating stage: " + (error.response?.data?.msg || error.message));
-    }
+      await api.post('/procurement/update-stage', { jobId, stageResult });
+      fetchMyJobs(); 
+    } catch (error) { alert(error.response?.data?.msg || error.message); }
   };
 
   return (
-    
     <AuthGuard requiredPermission="vendor_portal">
       <div className="min-h-screen bg-white">
-        {/* Header Section */}
-        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        {/* Header with Search & Filter Together */}
+        <div className="p-6 border-b flex flex-col lg:flex-row justify-between items-center gap-4 bg-slate-50">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-              Production Log Sheet
-            </h1>
-            <p className="text-slate-500 text-sm font-medium">
-              Manage your active job assignments and material wastage
-            </p>
+            <h1 className="text-xl font-black text-slate-900 uppercase">Production Log</h1>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={fetchMyJobs}
-              className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-all"
-            >
-              <FiLayers />
-            </button>
+          
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            <div className="relative flex-1 lg:w-64">
+              <FiSearch className="absolute left-3 top-2.5 text-slate-400" />
+              <input 
+                type="text" placeholder="Search Job ID..." value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-white border rounded-xl text-xs font-bold outline-none ring-blue-100 focus:ring-2"
+              />
+            </div>
+            <div className="flex items-center gap-2 bg-white border px-3 py-2 rounded-xl">
+              <FiFilter size={12} className="text-slate-400" />
+              <select 
+                value={vendorFilter} onChange={(e) => setVendorFilter(e.target.value)}
+                className="text-xs font-bold outline-none bg-transparent"
+              >
+                {uniqueVendors.map(v => <option key={v} value={v}>{v === "ALL" ? "All Vendors" : v}</option>)}
+              </select>
+            </div>
+            <button onClick={fetchMyJobs} className="p-2.5 bg-slate-900 text-white rounded-xl shadow-md hover:scale-95 transition-all"><FiLayers /></button>
           </div>
         </div>
 
-        {/* Excel Style Table Area */}
-        <div className="p-6">
-          <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1000px]">
+        <div className="p-4">
+          <div className="border rounded-2xl overflow-hidden shadow-sm">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-900 text-white text-[11px] font-black uppercase tracking-widest">
-                  <th className="p-4 border-r border-slate-800">Job ID</th>
-                  <th className="p-4 border-r border-slate-800">
-                    Product Details
-                  </th>
-                  <th className="p-4 border-r border-slate-800">
-                    Material Issued
-                  </th>
-                  <th className="p-4 border-r border-slate-800 text-center">
-                    Lot #
-                  </th>
-                  <th className="p-4 border-r border-slate-800 text-center">
-                    Target
-                  </th>
-                  <th className="p-4 border-r border-slate-800 text-center">
-                    Status
-                  </th>
-                  <th className="p-4 text-center">Action</th>
+                <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest">
+                  <th className="p-4 border-r border-slate-800">Job & Vendor</th>
+                  <th className="p-4 border-r border-slate-800">Product</th>
+                  <th className="p-4 border-r border-slate-800">Materials</th>
+                  <th className="p-4 border-r border-slate-800 text-center">Status</th>
+                  <th className="p-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-slate-100">
                 {loading ? (
-                  <tr>
-                    <td
-                      colSpan="7"
-                      className="p-20 text-center text-slate-400 font-bold"
-                    >
-                      Loading Ledger Data...
+                  <tr><td colSpan="5" className="p-10 text-center font-bold text-slate-400">LOADING...</td></tr>
+                ) : filteredJobs.map((job) => (
+                  <tr key={job._id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 border-r">
+                      <div className="font-mono font-black text-blue-600 text-xs">{job.jobId}</div>
+                      <div className="flex items-center gap-1 mt-1 text-slate-500">
+                        <FiUser size={10} />
+                        <span className="text-[10px] font-bold uppercase truncate max-w-[120px]">{job.vendorId?.name || "Unassigned"}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 border-r">
+                      <div className="font-bold text-slate-800 text-xs truncate max-w-[150px]">{job.productId?.name}</div>
+                      <div className="text-[9px] font-bold text-slate-400 uppercase">{job.productId?.sku}</div>
+                    </td>
+                    <td className="p-4 border-r">
+                      <div className="text-[10px] font-black text-slate-900">{job.totalQty} PCS</div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {job.issuedMaterials?.slice(0, 2).map((m, i) => (
+                          <span key={i} className="text-[8px] bg-slate-100 px-1 py-0.5 rounded font-bold">{m.lotNumber}</span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="p-4 border-r text-center">
+                      <span className={`text-[9px] font-black px-2 py-1 rounded uppercase border ${job.status === "In_Progress" ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-amber-50 text-amber-600 border-amber-100"}`}>
+                        {job.status.replace("_", " ")}
+                      </span>
+                    </td>
+                    <td className="p-4 text-center">
+                      {job.logisticsStatus === "In_Transit" ? (
+                        <div className="text-blue-600 font-black text-[9px] uppercase flex items-center justify-center gap-1">
+                          <FiTruck size={12} className="animate-bounce" /> In Transit
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-1 items-center">
+                          {job.currentStep === 'Cutting_Pending' && <button onClick={() => handleStageUpdate(job.jobId, 'Cutting_Started')} className="w-full bg-blue-600 text-white py-1.5 rounded-lg text-[9px] font-black uppercase">Start Cutting</button>}
+                          {job.currentStep === 'Cutting_Started' && <button onClick={() => handleStageUpdate(job.jobId, 'Cutting_Completed')} className="w-full bg-blue-800 text-white py-1.5 rounded-lg text-[9px] font-black uppercase">Cutting Done</button>}
+                          {job.currentStep === 'Stitching_Pending' && <button onClick={() => handleStageUpdate(job.jobId, 'Sewing_Started')} className="w-full bg-indigo-600 text-white py-1.5 rounded-lg text-[9px] font-black uppercase">Start Stitching</button>}
+                          {job.currentStep === 'Sewing_Started' && <button onClick={() => { setSelectedJob(job); setIsModalOpen(true); }} className="w-full bg-orange-600 text-white py-1.5 rounded-lg text-[9px] font-black uppercase">Dispatch</button>}
+                          {job.currentStep === 'Packaging_Pending' && <button onClick={() => handleStageUpdate(job.jobId, 'Packaging_Started')} className="w-full bg-purple-600 text-white py-1.5 rounded-lg text-[9px] font-black uppercase">Start Packing</button>}
+                          {job.currentStep === 'Packaging_Started' && <button onClick={() => { setSelectedJob(job); setIsModalOpen(true); }} className="w-full bg-slate-900 text-white py-1.5 rounded-lg text-[9px] font-black uppercase">Packing Dispatch</button>}
+                        </div>
+                      )}
                     </td>
                   </tr>
-                ) : jobs.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan="7"
-                      className="p-20 text-center text-slate-400 font-bold"
-                    >
-                      No Active Assignments
-                    </td>
-                  </tr>
-                ) : (
-                  jobs.map((job) => (
-                    <tr
-                      key={job._id}
-                      className="hover:bg-blue-50/30 transition-colors"
-                    >
-                      <td className="p-4 font-mono font-bold text-blue-600 border-r border-slate-100">
-                        {job.jobId}
-                      </td>
-                      <td className="p-4 border-r border-slate-100">
-                        <div className="font-bold text-slate-800">
-                          {job.productId?.name}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-bold">
-                          {job.productId?.sku}
-                        </div>
-                      </td>
-                      <td className="p-4 border-r border-slate-100">
-                        {job.issuedMaterials &&
-                        job.issuedMaterials.length > 0 ? (
-                          <div className="space-y-3">
-                            {job.issuedMaterials.map((mat, idx) => (
-                              <div
-                                key={idx}
-                                className="bg-slate-50 p-2 rounded-lg border border-slate-100"
-                              >
-                                <div className="font-black text-slate-900 text-[11px] uppercase">
-                                  {mat.materialName}
-                                </div>
-                                <div className="flex justify-between items-center mt-1">
-                                  <span className="text-[10px] font-bold text-slate-500">
-                                    Qty: {mat.qtyIssued}
-                                  </span>
-                                  <span className="text-[9px] font-mono bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                                    {mat.lotNumber}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-slate-300 italic text-xs">
-                            Waiting for Store Issue...
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-4 text-center border-r border-slate-100">
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[11px] font-black">
-                          {job.issuedMaterials?.[0]?.lotNumber || "---"}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center border-r border-slate-100 font-black text-slate-900">
-                        {job.totalQty}{" "}
-                        <span className="text-[10px] text-slate-400">PCS</span>
-                      </td>
-                      <td className="p-4 text-center border-r border-slate-100">
-                        <span
-                          className={`text-[10px] font-black px-2 py-1 rounded-md uppercase border ${
-                            job.status === "In_Progress"
-                              ? "bg-blue-50 text-blue-600 border-blue-100"
-                              : "bg-amber-50 text-amber-600 border-amber-100"
-                          }`}
-                        >
-                          {job.status.replace("_", " ")}
-                        </span>
-                      </td>
-                      {/* Action Column in Vendor Job List */}
-<td className="p-4 text-center">
-  <div className="flex flex-col gap-2">
-    
-    {/* Step 1: Cutting */}
-    {job.currentStep === 'Cutting_Pending' && (
-      <button 
-        onClick={() => handleStageUpdate(job.jobId, 'Cutting_Completed')}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-[10px] font-black uppercase hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all"
-      >
-        Mark Cutting Done
-      </button>
-    )}
-
-    {/* Step 2: Stitching */}
-    {job.currentStep === 'Stitching_Pending' && (
-      <button 
-        onClick={() => handleStageUpdate(job.jobId, 'Stitching_Completed')}
-        className="w-full bg-purple-600 text-white py-2 rounded-lg text-[10px] font-black uppercase hover:bg-purple-700"
-      >
-        Mark Stitching Done
-      </button>
-    )}
-
-    {/* Final Step: Dispatch (Triggers Wastage Modal) */}
-    {job.currentStep === 'Packaging_Pending' && (
-      <button 
-        onClick={() => { setSelectedJob(job); setIsModalOpen(true); }}
-        className="w-full bg-slate-900 text-white py-2 rounded-lg text-[10px] font-black uppercase hover:bg-black flex items-center justify-center gap-1"
-      >
-        <FiTruck className="mr-1" /> Final Dispatch
-      </button>
-    )}
-    
-    {/* Waiting State */}
-    {job.status === 'QC_Pending' && (
-      <span className="text-slate-400 font-bold text-[10px] italic">Sent for Admin QC</span>
-    )}
-  </div>
-</td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* --- Phase 3: Reporting Modal --- */}
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-            <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl animate-in zoom-in-95">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-black text-slate-900">
-                  Final Entry
-                </h2>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="p-2 bg-slate-100 rounded-full"
-                >
-                  <FiX />
-                </button>
+                <h2 className="text-lg font-black text-slate-900 uppercase">Report Work</h2>
+                <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-100 rounded-full"><FiX /></button>
               </div>
-
-              <form onSubmit={handleDispatch} className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleDispatch} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">
-                      Produced (PCS)
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xl"
-                      value={dispatchData.actualQty}
-                      onChange={(e) =>
-                        setDispatchData({
-                          ...dispatchData,
-                          actualQty: e.target.value,
-                        })
-                      }
-                    />
+                    <label className="text-[10px] font-black text-slate-400 uppercase">PCS Produced</label>
+                    <input type="number" required className="w-full p-3 bg-slate-50 border rounded-xl font-black text-lg" value={dispatchData.actualQty} onChange={(e) => setDispatchData({ ...dispatchData, actualQty: e.target.value })} />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">
-                      Wastage (KG)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xl text-red-600"
-                      value={dispatchData.wastage}
-                      onChange={(e) =>
-                        setDispatchData({
-                          ...dispatchData,
-                          wastage: e.target.value,
-                        })
-                      }
-                    />
+                    <label className="text-[10px] font-black text-slate-400 uppercase">Wastage (KG)</label>
+                    <input type="number" step="0.01" required className="w-full p-3 bg-slate-50 border rounded-xl font-black text-lg text-red-600" value={dispatchData.wastage} onChange={(e) => setDispatchData({ ...dispatchData, wastage: e.target.value })} />
                   </div>
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full py-4 bg-blue-600 text-white font-black rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
-                >
-                  {submitting
-                    ? "Processing..."
-                    : "Submit to Admin Verification"}
+                <button type="submit" disabled={submitting} className="w-full py-3.5 bg-blue-600 text-white font-black rounded-xl uppercase text-xs">
+                  {submitting ? "Processing..." : "Confirm Dispatch"}
                 </button>
               </form>
             </div>
