@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import api from "@/utils/api";
 import AuthGuard from "@/components/AuthGuard";
 import {
@@ -15,8 +15,8 @@ import {
   FiBox,
   FiActivity,
   FiRefreshCw,
-  FiMapPin, // 🟢 New Icon
-  FiMail // 🟢 New Icon
+  FiMapPin, 
+  FiMail 
 } from "react-icons/fi";
 
 export default function ProcurementPage() {
@@ -36,9 +36,9 @@ export default function ProcurementPage() {
     category: "Material Supplier",
     services: [],
     phone: "",
-    email: "",    // New
-    gst: "",      // New
-    address: ""   // New
+    email: "",    
+    gst: "",      
+    address: ""   
   });
 
   const [formData, setFormData] = useState({
@@ -79,7 +79,7 @@ export default function ProcurementPage() {
     });
   }, [materials]);
 
-  // 2. ACTION: PRE-FILL FORM FOR RESTOCKING
+  // 2. ACTION: PRE-FILL FORM FOR RESTOCKING (🟢 UPDATED TO SCROLL TO TOP)
   const handleRestock = (material) => {
       setActiveTab("RM");
       
@@ -96,7 +96,8 @@ export default function ProcurementPage() {
           unitPrice: "" 
       });
       
-      window.scrollTo({ top: 300, behavior: "smooth" });
+      // 🟢 Scroll to top where the form is now located
+      window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const getVendorNameForCard = (req) => {
@@ -136,6 +137,7 @@ export default function ProcurementPage() {
     });
 
     setSelectedJobId(req._id);
+    // 🟢 Already scrolls to top
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -209,11 +211,11 @@ export default function ProcurementPage() {
     <AuthGuard requiredPermission="procurement">
       <div className="space-y-8 animate-in fade-in">
         
-        {/* Header */}
+        {/* 🟢 1. HEADER (STAYS ON TOP) */}
         <div className="border-b border-slate-200 pb-6 flex justify-between items-end">
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-900">Procurement</h1>
-            <p className="text-slate-500 mt-2">Manage Purchases & Suppliers.</p>
+            <h1 className="text-3xl font-extrabold text-slate-900">Procurement Hub</h1>
+            <p className="text-slate-500 mt-2">Manage Purchases, Stock Strategy & Suppliers.</p>
           </div>
           <button
             onClick={() => setShowVendorModal(true)}
@@ -223,138 +225,11 @@ export default function ProcurementPage() {
           </button>
         </div>
 
-        {/* CRITICAL STOCK ALERT */}
-        {criticalMaterials.length > 0 && (
-          <div className="bg-white border border-red-100 rounded-2xl shadow-sm overflow-hidden animate-in slide-in-from-top-4">
-             <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between">
-                <h3 className="font-bold text-lg text-red-800 flex items-center gap-2">
-                  <FiActivity className="text-red-600" /> Critical Stock Levels
-                </h3>
-                <span className="bg-red-600 text-white text-xs font-black px-3 py-1 rounded-full animate-pulse">
-                   {criticalMaterials.length} Items Low
-                </span>
-             </div>
-             <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                   <thead>
-                      <tr className="bg-red-50/30 text-red-900/50 uppercase text-[10px] font-bold border-b border-red-50">
-                         <th className="px-6 py-3">Material Name</th>
-                         <th className="px-6 py-3">Current Stock</th>
-                         <th className="px-6 py-3">Safety Level</th>
-                         <th className="px-6 py-3">Deficit</th>
-                         <th className="px-6 py-3 text-right">Action</th>
-                      </tr>
-                   </thead>
-                   <tbody className="divide-y divide-red-50">
-                      {criticalMaterials.map((m) => (
-                         <tr key={m._id} className="hover:bg-red-50/40 transition-colors">
-                            <td className="px-6 py-3 font-bold text-slate-800">{m.name}</td>
-                            <td className="px-6 py-3 font-mono font-bold text-red-600">{m.stock?.current || 0} {m.unit}</td>
-                            <td className="px-6 py-3 font-mono text-slate-500">{m.safetyStock || 0} {m.unit}</td>
-                            <td className="px-6 py-3 font-mono font-bold text-slate-700">
-                               - {((m.safetyStock || 0) - (m.stock?.current || 0)).toFixed(2)}
-                            </td>
-                            <td className="px-6 py-3 text-right">
-                               <button 
-                                  onClick={() => handleRestock(m)}
-                                  className="text-xs font-bold bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 ml-auto shadow-md shadow-red-100 transition-all"
-                               >
-                                  <FiRefreshCw /> Restock
-                               </button>
-                            </td>
-                         </tr>
-                      ))}
-                   </tbody>
-                </table>
-             </div>
-          </div>
-        )}
-
-        {/* PENDING FULL-BUY REQUESTS */}
-        {pendingTrades.length > 0 && (
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-in slide-in-from-top-4">
-            <div className="bg-purple-50 px-6 py-4 border-b border-purple-100 flex items-center justify-between">
-              <h3 className="font-bold text-lg text-purple-900 flex items-center gap-2">
-                <FiAlertCircle /> Pending Full-Buy Requests
-              </h3>
-              <span className="bg-purple-600 text-white text-xs font-black px-2.5 py-1 rounded-full">
-                {pendingTrades.length} Action Items
-              </span>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/50 border-b border-slate-100 text-[10px] uppercase tracking-widest text-slate-500 font-bold">
-                    <th className="px-6 py-4">Request ID</th>
-                    <th className="px-6 py-4">Product Details</th>
-                    <th className="px-6 py-4">Assigned Vendor</th>
-                    <th className="px-6 py-4">Quantity</th>
-                    <th className="px-6 py-4">Negotiated Rate</th>
-                    <th className="px-6 py-4 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pendingTrades.map((req) => {
-                    const vendorName = getVendorNameForCard(req);
-                    const rate = req.unitCost || req.cost || 0;
-
-                    return (
-                      <tr key={req._id} className="hover:bg-slate-50 transition-colors group">
-                        <td className="px-6 py-4">
-                          <span className="font-mono text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">
-                            {req.jobId}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-slate-800 text-sm">
-                            {req.productId?.name || "Unknown Product"}
-                          </div>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <span className="bg-purple-100 text-purple-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase">
-                              Full Buy
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2 text-slate-600 font-semibold text-xs">
-                            <FiUser className="text-slate-400" />
-                            {vendorName}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
-                            <FiBox className="text-blue-500" />
-                            {req.totalQty} Units
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-1 text-emerald-600 font-black text-sm">
-                            <FiTag className="text-emerald-400" size={14} />
-                            ₹{rate.toLocaleString()}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => handleLoadRequest(req)}
-                            className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-bold hover:bg-purple-600 transition-all flex items-center gap-2 ml-auto shadow-md shadow-slate-200"
-                          >
-                            Prepare PO <FiArrowDown />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
+        {/* 🟢 2. MAIN WORKSPACE (PURCHASE FORM & VENDORS MOVED TO TOP) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* PURCHASE FORM */}
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 h-fit">
+          {/* PURCHASE FORM ENTRY */}
+          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 h-fit scroll-mt-10">
             <h3 className="font-bold text-xl mb-6 flex items-center gap-2 text-slate-800">
               <FiShoppingCart />
               {selectedJobId ? (
@@ -495,6 +370,7 @@ export default function ProcurementPage() {
             </form>
           </div>
 
+          {/* VENDORS LIST */}
           <div className="space-y-6">
             <h3 className="font-bold text-xl text-slate-800 flex items-center gap-2">
               <FiUser /> My Suppliers & Vendors
@@ -523,7 +399,6 @@ export default function ProcurementPage() {
                         <FiTrash2 />
                       </button>
                     </div>
-                    {/* 🟢 Vendor Details Section */}
                     <div className="mt-4 grid grid-cols-2 gap-y-2 gap-x-4 text-xs font-bold text-slate-500">
                       {vendor.phone && <div className="flex items-center gap-1"><FiPhone /> {vendor.phone}</div>}
                       {vendor.email && <div className="flex items-center gap-1"><FiMail /> {vendor.email}</div>}
@@ -537,7 +412,139 @@ export default function ProcurementPage() {
           </div>
         </div>
 
-        {/* VENDOR MODAL */}
+        {/* 🟢 3. NOTIFICATION & ALERT SECTIONS (MOVED TO BOTTOM) */}
+        <div className="space-y-8 pt-6 border-t border-slate-100">
+            
+            {/* PENDING FULL-BUY REQUESTS */}
+            {pendingTrades.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-in slide-in-from-top-4">
+                <div className="bg-purple-50 px-6 py-4 border-b border-purple-100 flex items-center justify-between">
+                <h3 className="font-bold text-lg text-purple-900 flex items-center gap-2">
+                    <FiAlertCircle /> Pending Full-Buy Requests
+                </h3>
+                <span className="bg-purple-600 text-white text-xs font-black px-2.5 py-1 rounded-full">
+                    {pendingTrades.length} Action Items
+                </span>
+                </div>
+                
+                <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                    <tr className="bg-slate-50/50 border-b border-slate-100 text-[10px] uppercase tracking-widest text-slate-500 font-bold">
+                        <th className="px-6 py-4">Request ID</th>
+                        <th className="px-6 py-4">Product Details</th>
+                        <th className="px-6 py-4">Assigned Vendor</th>
+                        <th className="px-6 py-4">Quantity</th>
+                        <th className="px-6 py-4">Negotiated Rate</th>
+                        <th className="px-6 py-4 text-right">Action</th>
+                    </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                    {pendingTrades.map((req) => {
+                        const vendorName = getVendorNameForCard(req);
+                        const rate = req.unitCost || req.cost || 0;
+
+                        return (
+                        <tr key={req._id} className="hover:bg-slate-50 transition-colors group">
+                            <td className="px-6 py-4">
+                            <span className="font-mono text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">
+                                {req.jobId}
+                            </span>
+                            </td>
+                            <td className="px-6 py-4">
+                            <div className="font-bold text-slate-800 text-sm">
+                                {req.productId?.name || "Unknown Product"}
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                                <span className="bg-purple-100 text-purple-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase">
+                                Full Buy
+                                </span>
+                            </div>
+                            </td>
+                            <td className="px-6 py-4">
+                            <div className="flex items-center gap-2 text-slate-600 font-semibold text-xs">
+                                <FiUser className="text-slate-400" />
+                                {vendorName}
+                            </div>
+                            </td>
+                            <td className="px-6 py-4">
+                            <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
+                                <FiBox className="text-blue-500" />
+                                {req.totalQty} Units
+                            </div>
+                            </td>
+                            <td className="px-6 py-4">
+                            <div className="flex items-center gap-1 text-emerald-600 font-black text-sm">
+                                <FiTag className="text-emerald-400" size={14} />
+                                ₹{rate.toLocaleString()}
+                            </div>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                            <button
+                                onClick={() => handleLoadRequest(req)}
+                                className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-bold hover:bg-purple-600 transition-all flex items-center gap-2 ml-auto shadow-md shadow-slate-200"
+                            >
+                                Prepare PO <FiArrowDown />
+                            </button>
+                            </td>
+                        </tr>
+                        );
+                    })}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+            )}
+
+            {/* CRITICAL STOCK ALERT */}
+            {criticalMaterials.length > 0 && (
+            <div className="bg-white border border-red-100 rounded-2xl shadow-sm overflow-hidden animate-in slide-in-from-top-4">
+                <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between">
+                    <h3 className="font-bold text-lg text-red-800 flex items-center gap-2">
+                    <FiActivity className="text-red-600" /> Critical Stock Levels
+                    </h3>
+                    <span className="bg-red-600 text-white text-xs font-black px-3 py-1 rounded-full animate-pulse">
+                    {criticalMaterials.length} Items Low
+                    </span>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                    <thead>
+                        <tr className="bg-red-50/30 text-red-900/50 uppercase text-[10px] font-bold border-b border-red-50">
+                            <th className="px-6 py-3">Material Name</th>
+                            <th className="px-6 py-3">Current Stock</th>
+                            <th className="px-6 py-3">Safety Level</th>
+                            <th className="px-6 py-3">Deficit</th>
+                            <th className="px-6 py-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-red-50">
+                        {criticalMaterials.map((m) => (
+                            <tr key={m._id} className="hover:bg-red-50/40 transition-colors">
+                                <td className="px-6 py-3 font-bold text-slate-800">{m.name}</td>
+                                <td className="px-6 py-3 font-mono font-bold text-red-600">{m.stock?.current || 0} {m.unit}</td>
+                                <td className="px-6 py-3 font-mono text-slate-500">{m.safetyStock || 0} {m.unit}</td>
+                                <td className="px-6 py-3 font-mono font-bold text-slate-700">
+                                - {((m.safetyStock || 0) - (m.stock?.current || 0)).toFixed(2)}
+                                </td>
+                                <td className="px-6 py-3 text-right">
+                                <button 
+                                    onClick={() => handleRestock(m)}
+                                    className="text-xs font-bold bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 ml-auto shadow-md shadow-red-100 transition-all"
+                                >
+                                    <FiRefreshCw /> Restock
+                                </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    </table>
+                </div>
+            </div>
+            )}
+        </div>
+
+        {/* VENDOR MODAL (STAYS SAME) */}
         {showVendorModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-100">
@@ -563,7 +570,6 @@ export default function ProcurementPage() {
                   </div>
                 </div>
                 
-                {/* 🟢 NEW FIELDS */}
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Phone</label>

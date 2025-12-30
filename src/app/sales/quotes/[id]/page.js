@@ -65,11 +65,11 @@ export default function ViewQuotePage() {
           </div>
           <div className="text-right">
             <h2 className="text-xl font-bold text-slate-800">
-              Shivram Hosiery
+              Shivram Hosiery Factory
             </h2>
             <p className="text-sm text-slate-500 max-w-[200px] leading-relaxed mt-1">
               <br />
-              Shivram Hosiery Factory, Ludhiana <br />
+              Ludhiana <br />
               GSTIN: 03AFEPA1102L1ZB
             </p>
           </div>

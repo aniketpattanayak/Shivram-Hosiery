@@ -260,10 +260,11 @@ export default function ClientsPage() {
     billToAddress: "",
     contactPerson: "",
     contactNumber: "",
+    billingContact: "", // 🟢 Added for uniqueness validation
     email: "",
     paymentTerms: "30 Days",
     salesPerson: "",
-    leadType: "Medium", // 🟢 Default Lead Type
+    leadType: "Medium", 
     interestedProducts: [],
   });
 
@@ -368,10 +369,11 @@ export default function ClientsPage() {
       billToAddress: client.billToAddress || "",
       contactPerson: client.contactPerson || "",
       contactNumber: client.contactNumber || "",
+      billingContact: client.billingContact || "",
       email: client.email || "",
       paymentTerms: client.paymentTerms || "30 Days",
       salesPerson: client.salesPerson || "",
-      leadType: client.leadType || "Medium", // 🟢 Load existing lead type
+      leadType: client.leadType || "Medium", 
       interestedProducts: client.interestedProducts || [],
     });
     setIsEditMode(true);
@@ -379,10 +381,48 @@ export default function ClientsPage() {
     setView("add");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // 🟢 Validation Function Moved Inside Component
+  const validateForm = () => {
+    // 1. GST Validation
+    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    if (formData.gstNumber && !gstRegex.test(formData.gstNumber)) {
+      alert("❌ Invalid GST Number format (e.g., 07AAAAA0000A1Z5)");
+      return false;
+    }
 
-    // 🟢 Step 1: Run Validations
+    // 2. Phone Number (10 Digits) Validation
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(formData.contactNumber)) {
+      alert("❌ Enter a valid 10-digit primary phone number starting with 6-9");
+      return false;
+    }
+
+    // 3. Billing Phone Validation (if provided)
+    if (formData.billingContact && !phoneRegex.test(formData.billingContact)) {
+        alert("❌ Enter a valid 10-digit billing phone number starting with 6-9");
+        return false;
+    }
+
+    // 4. Phone Uniqueness Check
+    if (formData.billingContact && formData.contactNumber === formData.billingContact) {
+        alert("❌ Primary Phone and Billing Phone cannot be the same.");
+        return false;
+    }
+
+    // 5. Email Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (formData.email && !emailRegex.test(formData.email)) {
+      alert("❌ Enter a valid Email address");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+
+    // 🟢 Run Validations
     if (!validateForm()) return;
 
     setLoading(true);
@@ -417,10 +457,11 @@ export default function ClientsPage() {
       billToAddress: "",
       contactPerson: "",
       contactNumber: "",
+      billingContact: "",
       email: "",
       paymentTerms: "30 Days",
       salesPerson: defaultSalesPerson,
-      leadType: "Medium", // 🟢 Reset to default
+      leadType: "Medium", 
       interestedProducts: [],
     });
     setIsEditMode(false);
@@ -536,7 +577,6 @@ export default function ClientsPage() {
                           >
                             <td className="p-4 font-bold text-slate-800">
                               {client.name}
-                              {/* 🟢 Show Lead Type Badge */}
                               <span
                                 className={`ml-2 px-1.5 py-0.5 rounded text-[10px] uppercase font-bold border ${
                                   client.leadType === "High"
@@ -623,437 +663,452 @@ export default function ClientsPage() {
           </div>
         )}
 
-        {view === "add" && (
-          <div className="max-w-4xl mx-auto pb-10">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <FiUser className="text-blue-500" />{" "}
-                  {isEditMode ? "Edit Client" : "Client Details"}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                      Company Name
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      required
-                      onChange={handleChange}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none"
-                    />
-                  </div>
-                  {/* GST Number Input */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                      GST Number
-                    </label>
-                    <input
-                      type="text"
-                      name="gstNumber"
-                      value={formData.gstNumber}
-                      maxLength={15} // 🟢 Limit to GST length
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          gstNumber: e.target.value.toUpperCase(),
-                        })
-                      } // 🟢 Force Uppercase
-                      placeholder="22AAAAA0000A1Z5"
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none uppercase"
-                    />
-                  </div>
+{view === "add" && (
+  <div className="max-w-4xl mx-auto pb-10">
+    <form 
+      onSubmit={handleSubmit} 
+      className="space-y-6"
+    >
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <FiUser className="text-blue-500" />{" "}
+          {isEditMode ? "Edit Client" : "Client Details"}
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+              Company Name
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name || ""}
+              required
+              onChange={handleChange}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none"
+            />
+          </div>
+          {/* GST Number Input */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+              GST Number
+            </label>
+            <input
+              type="text"
+              name="gstNumber"
+              value={formData.gstNumber || ""}
+              maxLength={15} 
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  gstNumber: e.target.value.toUpperCase(),
+                })
+              } 
+              placeholder="22AAAAA0000A1Z5"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none uppercase"
+            />
+          </div>
 
-                  {/* Phone Input */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                      Phone
-                    </label>
-                    <input
-                      type="text"
-                      name="contactNumber"
-                      value={formData.contactNumber}
-                      onChange={handleChange}
-                      maxLength={10} // 🟢 Limit to 10 digits
-                      placeholder="9876543210"
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"
-                    />
-                  </div>
+          {/* Primary Phone Input */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+              Primary Phone (10 Digits)
+            </label>
+            <input
+              type="text"
+              name="contactNumber"
+              value={formData.contactNumber || ""}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "");
+                if (val.length <= 10) setFormData({...formData, contactNumber: val});
+              }}
+              required
+              maxLength={10} 
+              placeholder="9876543210"
+              className={`w-full p-3 bg-slate-50 border rounded-xl font-medium outline-none ${formData.contactNumber?.length > 0 && formData.contactNumber?.length < 10 ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}
+            />
+          </div>
 
-                  {/* 🟢 NEW: Lead Type Dropdown */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                      Lead Priority
-                    </label>
-                    <select
-                      name="leadType"
-                      value={formData.leadType}
-                      onChange={handleChange}
-                      className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold outline-none text-slate-700"
-                    >
-                      <option value="High">🔥 High Priority</option>
-                      <option value="Medium">⚡ Medium Priority</option>
-                      <option value="Low">🧊 Low Priority</option>
-                    </select>
-                  </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+              Lead Priority
+            </label>
+            <select
+              name="leadType"
+              value={formData.leadType || "Medium"}
+              onChange={handleChange}
+              className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold outline-none text-slate-700"
+            >
+              <option value="High">🔥 High Priority</option>
+              <option value="Medium">⚡ Medium Priority</option>
+              <option value="Low">🧊 Low Priority</option>
+            </select>
+          </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email || ""}
+              onChange={handleChange}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"
+            />
+          </div>
+        </div>
+      </div>
 
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                    <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
-                      <FiBox />
-                    </div>
-                    Interested Products
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={addProductRow}
-                    className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 flex items-center gap-1"
-                  >
-                    <FiPlus /> Add Item
-                  </button>
-                </div>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2">
+            <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
+              <FiBox />
+            </div>
+            Interested Products
+          </h3>
+          <button
+            type="button"
+            onClick={addProductRow}
+            className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 flex items-center gap-1"
+          >
+            <FiPlus /> Add Item
+          </button>
+        </div>
 
-                {formData.interestedProducts.length === 0 && (
-                  <div className="text-sm text-slate-400 text-center py-4 border-2 border-dashed border-slate-100 rounded-xl">
-                    No products added yet. Click "Add Item" to define
-                    requirements.
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  {formData.interestedProducts.map((item, index) => {
-                    const selectedCatObj = categories.find(
-                      (c) => c.name === item.category
-                    );
-                    const subCats = selectedCatObj
-                      ? selectedCatObj.subCategories
-                      : [];
-                    return (
-                      <div
-                        key={index}
-                        className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => removeProductRow(index)}
-                          className="absolute top-2 right-2 text-slate-400 hover:text-red-500"
-                        >
-                          <FiTrash2 />
-                        </button>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                          <div className="col-span-3">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">
-                              Product Name
-                            </label>
-                            <input
-                              list={`products-list-${index}`}
-                              className="w-full p-2 rounded-lg border border-slate-300 text-sm font-bold"
-                              value={item.productName}
-                              onChange={(e) =>
-                                handleProductChange(
-                                  index,
-                                  "productName",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Type to search or add new..."
-                            />
-                            <datalist id={`products-list-${index}`}>
-                              {masterProducts.map((p) => (
-                                <option key={p._id} value={p.name}>
-                                  {p.sku}
-                                </option>
-                              ))}
-                            </datalist>
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">
-                              Category
-                            </label>
-                            <select
-                              className="w-full p-2 rounded-lg border border-slate-300 text-sm"
-                              value={item.category}
-                              onChange={(e) =>
-                                handleProductChange(
-                                  index,
-                                  "category",
-                                  e.target.value
-                                )
-                              }
-                            >
-                              <option value="">Select</option>
-                              {categories.map((c) => (
-                                <option key={c._id} value={c.name}>
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">
-                              Sub-Cat
-                            </label>
-                            <select
-                              className="w-full p-2 rounded-lg border border-slate-300 text-sm"
-                              value={item.subCategory}
-                              onChange={(e) =>
-                                handleProductChange(
-                                  index,
-                                  "subCategory",
-                                  e.target.value
-                                )
-                              }
-                              disabled={!item.category}
-                            >
-                              <option value="">Select</option>
-                              {subCats.map((s) => (
-                                <option key={s} value={s}>
-                                  {s}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">
-                              Fabric
-                            </label>
-                            <select
-                              className="w-full p-2 rounded-lg border border-slate-300 text-sm"
-                              value={item.fabric}
-                              onChange={(e) =>
-                                handleProductChange(
-                                  index,
-                                  "fabric",
-                                  e.target.value
-                                )
-                              }
-                            >
-                              <option value="">Select</option>
-                              {fabrics.map((f) => (
-                                <option key={f} value={f}>
-                                  {f}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">
-                              Color
-                            </label>
-                            <select
-                              className="w-full p-2 rounded-lg border border-slate-300 text-sm"
-                              value={item.color}
-                              onChange={(e) =>
-                                handleProductChange(
-                                  index,
-                                  "color",
-                                  e.target.value
-                                )
-                              }
-                            >
-                              <option value="">Select</option>
-                              {colors.map((c) => (
-                                <option key={c} value={c}>
-                                  {c}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">
-                              Qty
-                            </label>
-                            <input
-                              type="text"
-                              className="w-full p-2 rounded-lg border border-slate-300 text-sm"
-                              value={item.expectedQty}
-                              onChange={(e) =>
-                                handleProductChange(
-                                  index,
-                                  "expectedQty",
-                                  e.target.value
-                                )
-                              }
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">
-                              Rate (₹)
-                            </label>
-                            <input
-                              type="text"
-                              className="w-full p-2 rounded-lg border border-slate-300 text-sm"
-                              value={item.targetRate}
-                              onChange={(e) =>
-                                handleProductChange(
-                                  index,
-                                  "targetRate",
-                                  e.target.value
-                                )
-                              }
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <FiCreditCard className="text-emerald-500" /> Commercials &
-                  Location
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                      Billing Address
-                    </label>
-                    <textarea
-                      name="billToAddress"
-                      value={formData.billToAddress}
-                      onChange={handleChange}
-                      rows="2"
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"
-                    ></textarea>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                      Shipping Address
-                    </label>
-                    <textarea
-                      name="address"
-                      value={formData.address}
-                      onChange={handleChange}
-                      rows="2"
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"
-                    ></textarea>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                      Contact Person
-                    </label>
-                    <input
-                      type="text"
-                      name="contactPerson"
-                      value={formData.contactPerson}
-                      onChange={handleChange}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                      Phone
-                    </label>
-                    <input
-                      type="text"
-                      name="contactNumber"
-                      value={formData.contactNumber}
-                      onChange={handleChange}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                      Payment Terms
-                    </label>
-                    <select
-                      name="paymentTerms"
-                      value={formData.paymentTerms}
-                      onChange={handleChange}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"
-                    >
-                      <option value="Advance">Advance</option>
-                      <option value="15 Days">15 Days</option>
-                      <option value="30 Days">30 Days</option>
-                      <option value="45 Days">45 Days</option>
-                      <option value="60 Days">60 Days</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
-                      <FiBriefcase /> Sales Rep
-                    </label>
-                    {isSalesPersonLocked ? (
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={formData.salesPerson}
-                          disabled
-                          className="w-full p-3 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-500 cursor-not-allowed"
-                        />
-                        <span className="absolute right-3 top-3 text-[10px] text-slate-400 font-bold uppercase">
-                          Locked
-                        </span>
-                      </div>
-                    ) : (
-                      <select
-                        name="salesPerson"
-                        value={formData.salesPerson}
-                        onChange={handleChange}
-                        className="w-full p-3 bg-white border border-blue-200 text-blue-700 rounded-xl font-bold outline-none"
-                      >
-                        <option value="">-- Assign --</option>
-                        {usersList.map((u) => (
-                          <option key={u._id} value={u.name}>
-                            {u.name} ({u.role})
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setView("list");
-                    resetForm();
-                  }}
-                  className="flex-1 py-4 bg-white text-slate-600 font-bold rounded-xl border border-slate-200 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 py-4 bg-slate-900 text-white font-bold rounded-xl shadow-lg hover:bg-black flex justify-center items-center gap-2"
-                >
-                  {loading ? (
-                    "Saving..."
-                  ) : (
-                    <>
-                      <FiSave /> {isEditMode ? "Update" : "Save"}
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+        {formData.interestedProducts?.length === 0 && (
+          <div className="text-sm text-slate-400 text-center py-4 border-2 border-dashed border-slate-100 rounded-xl">
+            No products added yet. Click "Add Item" to define
+            requirements.
           </div>
         )}
+
+        <div className="space-y-3">
+          {formData.interestedProducts?.map((item, index) => {
+            const selectedCatObj = categories.find(
+              (c) => c.name === item.category
+            );
+            const subCats = selectedCatObj
+              ? selectedCatObj.subCategories
+              : [];
+            return (
+              <div
+                key={index}
+                className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative"
+              >
+                <button
+                  type="button"
+                  onClick={() => removeProductRow(index)}
+                  className="absolute top-2 right-2 text-slate-400 hover:text-red-500"
+                >
+                  <FiTrash2 />
+                </button>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                  <div className="col-span-3">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">
+                      Product Name
+                    </label>
+                    <input
+                      list={`products-list-${index}`}
+                      className="w-full p-2 rounded-lg border border-slate-300 text-sm font-bold"
+                      value={item.productName || ""}
+                      onChange={(e) =>
+                        handleProductChange(
+                          index,
+                          "productName",
+                          e.target.value
+                        )
+                      }
+                      placeholder="Type to search or add new..."
+                    />
+                    <datalist id={`products-list-${index}`}>
+                      {masterProducts.map((p) => (
+                        <option key={p._id} value={p.name}>
+                          {p.sku}
+                        </option>
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">
+                      Category
+                    </label>
+                    <select
+                      className="w-full p-2 rounded-lg border border-slate-300 text-sm"
+                      value={item.category || ""}
+                      onChange={(e) =>
+                        handleProductChange(
+                          index,
+                          "category",
+                          e.target.value
+                        )
+                      }
+                    >
+                      <option value="">Select</option>
+                      {categories.map((c) => (
+                        <option key={c._id} value={c.name}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">
+                      Sub-Cat
+                    </label>
+                    <select
+                      className="w-full p-2 rounded-lg border border-slate-300 text-sm"
+                      value={item.subCategory || ""}
+                      onChange={(e) =>
+                        handleProductChange(
+                          index,
+                          "subCategory",
+                          e.target.value
+                        )
+                      }
+                      disabled={!item.category}
+                    >
+                      <option value="">Select</option>
+                      {subCats.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">
+                      Fabric
+                    </label>
+                    <select
+                      className="w-full p-2 rounded-lg border border-slate-300 text-sm"
+                      value={item.fabric || ""}
+                      onChange={(e) =>
+                        handleProductChange(
+                          index,
+                          "fabric",
+                          e.target.value
+                        )
+                      }
+                    >
+                      <option value="">Select</option>
+                      {fabrics.map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">
+                      Color
+                    </label>
+                    <select
+                      className="w-full p-2 rounded-lg border border-slate-300 text-sm"
+                      value={item.color || ""}
+                      onChange={(e) =>
+                        handleProductChange(
+                          index,
+                          "color",
+                          e.target.value
+                        )
+                      }
+                    >
+                      <option value="">Select</option>
+                      {colors.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">
+                      Qty
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full p-2 rounded-lg border border-slate-300 text-sm"
+                      value={item.expectedQty || ""}
+                      onChange={(e) =>
+                        handleProductChange(
+                          index,
+                          "expectedQty",
+                          e.target.value
+                        )
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">
+                      Rate (₹)
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full p-2 rounded-lg border border-slate-300 text-sm"
+                      value={item.targetRate || ""}
+                      onChange={(e) =>
+                        handleProductChange(
+                          index,
+                          "targetRate",
+                          e.target.value
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <FiCreditCard className="text-emerald-500" /> Commercials &
+          Location
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+              Billing Address
+            </label>
+            <textarea
+              name="billToAddress"
+              value={formData.billToAddress || ""}
+              onChange={handleChange}
+              rows="2"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"
+            ></textarea>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+              Shipping Address
+            </label>
+            <textarea
+              name="address"
+              value={formData.address || ""}
+              onChange={handleChange}
+              rows="2"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"
+            ></textarea>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+              Contact Person
+            </label>
+            <input
+              type="text"
+              name="contactPerson"
+              value={formData.contactPerson || ""}
+              onChange={handleChange}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+              Billing Phone (Must be different)
+            </label>
+            <input
+              type="text"
+              name="billingContact"
+              value={formData.billingContact || ""}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "");
+                if (val.length <= 10) setFormData({...formData, billingContact: val});
+              }}
+              required
+              maxLength={10}
+              placeholder="0987654321"
+              className={`w-full p-3 bg-slate-50 border rounded-xl font-medium outline-none ${formData.billingContact === formData.contactNumber && formData.billingContact?.length > 0 ? 'border-red-500 bg-red-50' : 'border-slate-200'}`}
+            />
+            {formData.billingContact === formData.contactNumber && formData.billingContact?.length > 0 && (
+              <p className="text-[10px] text-red-500 font-bold mt-1 uppercase">Cannot be same as Primary Phone</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+              Payment Terms
+            </label>
+            <select
+              name="paymentTerms"
+              value={formData.paymentTerms || "Advance"}
+              onChange={handleChange}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none"
+            >
+              <option value="Advance">Advance</option>
+              <option value="15 Days">15 Days</option>
+              <option value="30 Days">30 Days</option>
+              <option value="45 Days">45 Days</option>
+              <option value="60 Days">60 Days</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+              <FiBriefcase /> Sales Rep
+            </label>
+            {isSalesPersonLocked ? (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.salesPerson || ""}
+                  disabled
+                  className="w-full p-3 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-500 cursor-not-allowed"
+                />
+                <span className="absolute right-3 top-3 text-[10px] text-slate-400 font-bold uppercase">
+                  Locked
+                </span>
+              </div>
+            ) : (
+              <select
+                name="salesPerson"
+                value={formData.salesPerson || ""}
+                onChange={handleChange}
+                className="w-full p-3 bg-white border border-blue-200 text-blue-700 rounded-xl font-bold outline-none"
+              >
+                <option value="">-- Assign --</option>
+                {usersList.map((u) => (
+                  <option key={u._id} value={u.name}>
+                    {u.name} ({u.role})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-4">
+        <button
+          type="button"
+          onClick={() => {
+            setView("list");
+            resetForm();
+          }}
+          className="flex-1 py-4 bg-white text-slate-600 font-bold rounded-xl border border-slate-200 hover:bg-slate-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          className="flex-1 py-4 bg-slate-900 text-white font-bold rounded-xl shadow-lg hover:bg-black flex justify-center items-center gap-2"
+        >
+          {loading ? (
+            "Saving..."
+          ) : (
+            <>
+              <FiSave /> {isEditMode ? "Update" : "Save"}
+            </>
+          )}
+        </button>
+      </div>
+    </form>
+  </div>
+)}
         <ActivityModal
           isOpen={!!selectedClient}
           client={selectedClient}
@@ -1073,29 +1128,3 @@ export default function ClientsPage() {
     </AuthGuard>
   );
 }
-
-// 🟢 NEW: Validation Helper Function
-const validateForm = () => {
-  // 1. GST Validation (Indian Format: 2 digits, 10 chars, 1 digit, 1 char, 1 digit)
-  const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-  if (formData.gstNumber && !gstRegex.test(formData.gstNumber)) {
-    alert("❌ Invalid GST Number format (e.g., 07AAAAA0000A1Z5)");
-    return false;
-  }
-
-  // 2. Phone Number (10 Digits)
-  const phoneRegex = /^[6-9]\d{9}$/;
-  if (!phoneRegex.test(formData.contactNumber)) {
-    alert("❌ Enter a valid 10-digit mobile number starting with 6-9");
-    return false;
-  }
-
-  // 3. Email Validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (formData.email && !emailRegex.test(formData.email)) {
-    alert("❌ Enter a valid Email address");
-    return false;
-  }
-
-  return true;
-};
