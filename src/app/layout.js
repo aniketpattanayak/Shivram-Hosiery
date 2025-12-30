@@ -1,8 +1,6 @@
 import "./globals.css";
-import { Inter } from "next/font/google";
+// 🟢 30-YEAR INSIGHT: Removed Google Font import to stop network timeout errors
 import LayoutWrapper from "../components/LayoutWrapper";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
   title: "Shivram ERP",
@@ -12,8 +10,15 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      {/* 🟢 ADD suppressHydrationWarning={true} HERE */}
-      <body className={inter.className} suppressHydrationWarning={true}>
+      <head>
+        {/* You can add specific head tags here if needed */}
+      </head>
+      {/* 🟢 FIXED: Added suppressHydrationWarning as requested */}
+      {/* 🟢 FIXED: Used standard system font stack to avoid Inter download errors */}
+      <body 
+        className="antialiased font-sans bg-slate-50 text-slate-900" 
+        suppressHydrationWarning={true}
+      >
         <LayoutWrapper>
           {children}
         </LayoutWrapper>

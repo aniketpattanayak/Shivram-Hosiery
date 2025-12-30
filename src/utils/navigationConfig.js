@@ -1,9 +1,10 @@
-// src/utils/navigationConfig.js
+'use client';
 import {
   FiGrid, FiShoppingCart, FiScissors, FiBox, FiTruck, FiSettings, FiPlay, FiLayers, 
   FiPieChart, FiUserCheck, FiFileText, FiCreditCard, FiPlusSquare, FiActivity, FiTool,
   FiPackage, FiZap, 
-  FiHome, FiClipboard, FiTrendingUp // 🟢 Added FiTrendingUp for the report
+  FiHome, FiClipboard, FiTrendingUp,
+  FiBarChart2, FiAlertTriangle, FiTarget // 🟢 Added for Intelligence Center
 } from "react-icons/fi";
 import { PiDress } from "react-icons/pi";
 
@@ -55,6 +56,8 @@ export const SYSTEM_MODULES = [
       { name: "Full Kitting", href: "/kitting", icon: FiPackage, key: "production" }, 
       { name: "Production Floor", href: "/shop-floor", icon: FiPlay },
       { name: "Quality Control", href: "/qc", icon: FiSettings },
+      // 🟢 QC ADMIN GATE: Added to manage rejections and holds
+      { name: "QC Review (Admin)", href: "/qc-review", icon: FiAlertTriangle },
     ]
   },
   {
@@ -79,8 +82,9 @@ export const SYSTEM_MODULES = [
     icon: FiPieChart,
     key: "analytics", 
     items: [
+      // 🟢 STRATEGIC HUB: The 4-Tab Dashboard (Sales, Production, Vendor, User)
+      { name: "Intelligence Hub", href: "/factory-intelligence", icon: FiTarget },
       { name: "Reports Center", href: "/reports", icon: FiPieChart },
-      // 🟢 ADDED: Link to the new Accountability Report
       { name: "Vendor Efficiency", href: "/reports/efficiency", icon: FiTrendingUp }, 
     ]
   }
