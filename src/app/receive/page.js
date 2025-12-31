@@ -2,18 +2,24 @@
 import { useState, useEffect, useMemo } from "react";
 import api from '@/utils/api';
 import {
-  FiClock, FiPlus, FiSave, FiFilter, FiRefreshCw, FiShield, FiAlertTriangle, FiCheckCircle, FiSearch, FiCheckSquare
+  FiClock, FiPlus, FiSave, FiFilter, FiRefreshCw, FiShield, FiAlertTriangle, FiCheckCircle, FiSearch, FiCheckSquare, FiPlusCircle
 } from "react-icons/fi";
 
-// [Keep QCModal and DirectReceiveModal exactly as they were in previous turn]
-// I am pasting them here briefly for context, but the main change is in the main component below.
-
+// 🟢 MODAL: QC INSPECTION (UPDATED TO ALLOW SURPLUS)
 const QCModal = ({ order, onClose, onSuccess, user }) => {
-    // ... (Same as previous code)
     const remaining = order.orderedQty - order.receivedQty;
-    const [formData, setFormData] = useState({ qtyReceived: remaining, sampleSize: "", rejectedQty: "", reason: "", lotNumber: "" });
+    const [formData, setFormData] = useState({ 
+        qtyReceived: remaining > 0 ? remaining : 0, 
+        sampleSize: "", 
+        rejectedQty: "", 
+        reason: "", 
+        lotNumber: "" 
+    });
     const [loading, setLoading] = useState(false);
-    const stockToAdd = (Number(formData.qtyReceived) || 0) - (Number(formData.rejectedQty) || 0);
+    
+    // 🔍 Calculate Surplus dynamically
+    const extraPieces = Math.max(0, Number(formData.qtyReceived) - Math.max(0, remaining));
+
     const rejectionRate = formData.sampleSize ? ((Number(formData.rejectedQty) / Number(formData.sampleSize)) * 100).toFixed(1) : 0;
     const isHighFailure = rejectionRate > 20;
 
@@ -27,7 +33,8 @@ const QCModal = ({ order, onClose, onSuccess, user }) => {
                 qcBy: user?.name || "Unknown",
                 sampleSize: formData.sampleSize,
                 rejectedQty: formData.rejectedQty,
-                reason: formData.reason
+                reason: formData.reason,
+                orderedQty: order.orderedQty // Send this for Surplus Ledger logic
             });
             alert(res.data.msg); 
             onSuccess();
@@ -42,12 +49,19 @@ const QCModal = ({ order, onClose, onSuccess, user }) => {
                     <div className="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-1 rounded">Inspector: {user?.name}</div>
                 </div>
                 <div className="p-6 space-y-4">
-                     <div className="bg-slate-50 p-3 rounded text-xs text-slate-500 mb-2 border border-slate-200 flex justify-between">
+                     <div className="bg-slate-50 p-3 rounded text-xs text-slate-500 mb-2 border border-slate-200 flex justify-between items-center">
                         <div>Checking: <span className="font-bold text-slate-800">{order.itemName}</span></div>
-                        <div>Pending: <span className="font-bold text-red-600">{remaining}</span></div>
+                        <div className="text-right">
+                            <p>Pending: <span className="font-bold text-red-600">{Math.max(0, remaining)}</span></p>
+                            {extraPieces > 0 && <p className="text-orange-600 font-black animate-pulse flex items-center gap-1 justify-end"><FiPlusCircle/> +{extraPieces} Surplus</p>}
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div><label className="text-xs font-bold text-slate-500 uppercase">Qty Receiving</label><input type="number" className="w-full border p-2 rounded mt-1 font-bold text-lg" value={formData.qtyReceived} max={remaining} onChange={e => setFormData({...formData, qtyReceived: e.target.value})} /></div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase">Qty Receiving</label>
+                            {/* 🟢 FIXED: REMOVED max={remaining} to allow surplus */}
+                            <input type="number" className={`w-full border p-2 rounded mt-1 font-bold text-lg ${extraPieces > 0 ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-slate-300'}`} value={formData.qtyReceived} onChange={e => setFormData({...formData, qtyReceived: e.target.value})} />
+                        </div>
                         <div><label className="text-xs font-bold text-slate-500 uppercase">Batch</label><input type="text" className="w-full border p-2 rounded mt-1 uppercase" placeholder="Auto" value={formData.lotNumber} onChange={e => setFormData({...formData, lotNumber: e.target.value})} /></div>
                     </div>
                     <div className="grid grid-cols-2 gap-4 bg-purple-50/50 p-4 rounded border border-purple-100">
@@ -62,30 +76,35 @@ const QCModal = ({ order, onClose, onSuccess, user }) => {
                 </div>
                 <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 bg-slate-50">
                     <button onClick={onClose} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded text-sm">Cancel</button>
-                    <button onClick={handleSubmit} disabled={loading} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded text-sm flex items-center gap-2">{loading ? "..." : "Submit"}</button>
+                    <button onClick={handleSubmit} disabled={loading} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded text-sm flex items-center gap-2">{loading ? "..." : "Confirm Receipt"}</button>
                 </div>
             </div>
         </div>
     );
 };
 
+// 🟢 MODAL: DIRECT RECEIVE (UPDATED TO ALLOW SURPLUS)
 const DirectReceiveModal = ({ order, onClose, onSuccess, user }) => {
     const remaining = order.orderedQty - order.receivedQty;
-    const [qtyInput, setQtyInput] = useState(remaining);
+    const [qtyInput, setQtyInput] = useState(remaining > 0 ? remaining : 0);
     const [lotInput, setLotInput] = useState("");
     const [loading, setLoading] = useState(false);
   
+    // 🔍 Calculate Surplus dynamically
+    const extraPieces = Math.max(0, Number(qtyInput) - Math.max(0, remaining));
+
     const handleSubmit = async () => {
-      if(Number(qtyInput) > remaining) return alert("Exceeds pending order.");
+      // 🟢 FIXED: REMOVED validation check that blocked exceeding quantity
       setLoading(true);
       try {
         await api.put(`procurement/receive/${order._id}`, {
             mode: 'direct',
             qtyReceived: qtyInput,
             lotNumber: lotInput,
-            qcBy: user?.name || "Direct" // Record who did direct receive
+            qcBy: user?.name || "Direct",
+            orderedQty: order.orderedQty 
         });
-        alert(`Received ${qtyInput} units. ✅`);
+        alert(`Received ${qtyInput} units. ${extraPieces > 0 ? '(Including Surplus)' : ''} ✅`);
         onSuccess();
       } catch (error) { alert(error.message); } finally { setLoading(false); }
     };
@@ -93,10 +112,17 @@ const DirectReceiveModal = ({ order, onClose, onSuccess, user }) => {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in">
         <div className="bg-white rounded w-full max-w-sm shadow-2xl overflow-hidden border border-slate-300">
-            <div className="bg-emerald-50 px-6 py-3 border-b border-emerald-100"><h3 className="font-bold text-emerald-800">Direct Receive</h3></div>
+            <div className="bg-emerald-50 px-6 py-3 border-b border-emerald-100 flex justify-between items-center">
+                <h3 className="font-bold text-emerald-800">Direct Receive</h3>
+                {extraPieces > 0 && <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black">+{extraPieces} EXTRA</span>}
+            </div>
             <div className="p-6 space-y-4">
-                <div className="text-xs text-slate-500 mb-2">Pending: <span className="font-bold text-red-600">{remaining}</span></div>
-                <div><label className="text-xs font-bold text-slate-500 uppercase">Quantity</label><input type="number" className="w-full border p-2 rounded mt-1 text-lg font-bold" max={remaining} value={qtyInput} onChange={e => setQtyInput(e.target.value)} /></div>
+                <div className="text-xs text-slate-500 mb-2">Pending: <span className="font-bold text-red-600">{Math.max(0, remaining)}</span></div>
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase">Quantity</label>
+                    {/* 🟢 FIXED: REMOVED max={remaining} */}
+                    <input type="number" className={`w-full border p-2 rounded mt-1 text-lg font-bold ${extraPieces > 0 ? 'border-orange-500 bg-orange-50' : 'border-slate-300'}`} value={qtyInput} onChange={e => setQtyInput(e.target.value)} />
+                </div>
                 <div><label className="text-xs font-bold text-slate-500 uppercase">Batch</label><input type="text" className="w-full border p-2 rounded mt-1 uppercase" placeholder="Auto" value={lotInput} onChange={e => setLotInput(e.target.value)} /></div>
             </div>
             <div className="px-6 py-3 bg-slate-50 flex justify-end gap-2 border-t border-slate-200">
@@ -142,7 +168,6 @@ export default function ReceiveStockPage() {
     (o.vendor_id?.name || "").toLowerCase().includes(filter.toLowerCase())
   );
 
-  // Flatten history for display (Each history log entry becomes a row)
   const flattenedHistory = useMemo(() => {
       let flat = [];
       history.forEach(order => {
@@ -157,14 +182,13 @@ export default function ReceiveStockPage() {
               });
           }
       });
-      // Sort by date desc
       return flat.sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [history]);
 
   const filteredHistory = flattenedHistory.filter(h => 
-      h.itemName.toLowerCase().includes(historyFilter.toLowerCase()) || 
-      h.vendor.toLowerCase().includes(historyFilter.toLowerCase()) ||
-      h.receivedBy.toLowerCase().includes(historyFilter.toLowerCase())
+      (h.itemName || "").toLowerCase().includes(historyFilter.toLowerCase()) || 
+      (h.vendor || "").toLowerCase().includes(historyFilter.toLowerCase()) ||
+      (h.receivedBy || "").toLowerCase().includes(historyFilter.toLowerCase())
   );
 
   return (
@@ -206,8 +230,9 @@ export default function ReceiveStockPage() {
                                 <td className="p-3 border-r text-right font-mono text-green-600">{order.receivedQty}</td>
                                 <td className="p-3 border-r text-right font-mono text-red-600 font-bold bg-red-50/50">{remaining}</td>
                                 <td className="p-2 text-center flex gap-2 justify-center">
-                                    <button onClick={() => setDirectModal(order)} disabled={remaining === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1.5 rounded text-xs font-bold flex items-center gap-1"><FiPlus/> Direct</button>
-                                    <button onClick={() => setQcModal(order)} disabled={remaining === 0} className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1.5 rounded text-xs font-bold flex items-center gap-1"><FiShield/> QC</button>
+                                    {/* 🟢 FIXED: REMOVED disabled={remaining === 0} to allow extra stock receipt */}
+                                    <button onClick={() => setDirectModal(order)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1.5 rounded text-xs font-bold flex items-center gap-1"><FiPlus/> Direct</button>
+                                    <button onClick={() => setQcModal(order)} className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1.5 rounded text-xs font-bold flex items-center gap-1"><FiShield/> QC</button>
                                 </td>
                             </tr>
                         );

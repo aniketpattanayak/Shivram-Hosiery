@@ -5,7 +5,8 @@ import {
   FiPackage, FiZap, 
   FiHome, FiClipboard, FiTrendingUp,
   FiBarChart2, FiAlertTriangle, FiTarget,
-  FiRotateCcw, FiShield // 🟢 Added for Return Management & QC Hold
+  FiRotateCcw, FiShield,
+  FiPlusCircle // 🟢 Added for Surplus Tracking
 } from "react-icons/fi";
 import { PiDress } from "react-icons/pi";
 
@@ -25,7 +26,7 @@ export const SYSTEM_MODULES = [
       { name: "Quotations", href: "/sales/quotes", icon: FiFileText },
       { name: "Sales Orders", href: "/sales/orders", icon: FiShoppingCart },
       { name: "Dispatch", href: "/dispatch", icon: FiTruck },
-      { name: "Return Request", href: "/returns", icon: FiRotateCcw }, // 🟢 NEW: Product Returns Page
+      { name: "Return Request", href: "/returns", icon: FiRotateCcw }, 
       { name: "Log Expense", href: "/sales/expenses/new", icon: FiPlusSquare },
     ]
   },
@@ -37,6 +38,7 @@ export const SYSTEM_MODULES = [
       { name: "Product Master", href: "/products", icon: FiLayers },
       { name: "Sampling & R&D", href: "/sampling", icon: PiDress },
       { name: "Inventory", href: "/inventory", icon: FiBox },
+      { name: "Surplus Tracker", href: "/surplus", icon: FiPlusCircle }, // 🟢 NEW: Extra Pieces Shadow Ledger
     ]
   },
   {
@@ -83,7 +85,7 @@ export const SYSTEM_MODULES = [
     key: "analytics", 
     items: [
       { name: "Intelligence Hub", href: "/factory-intelligence", icon: FiTarget },
-      { name: "QC Hold/Returns", href: "/returns/admin", icon: FiShield }, // 🟢 NEW: Admin Approval Dashboard
+      { name: "QC Hold/Returns", href: "/returns/admin", icon: FiShield }, 
       { name: "Reports Center", href: "/reports", icon: FiPieChart },
       { name: "Vendor Efficiency", href: "/reports/efficiency", icon: FiTrendingUp }, 
     ]
