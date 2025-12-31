@@ -143,7 +143,7 @@ export default function LogisticsPage() {
                 <div className="p-12 print:p-8 text-slate-900">
                     <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-8">
                         <div>
-                            <h1 className="text-3xl font-black tracking-tight uppercase">Delivery Challan</h1>
+                            <h1 className="text-3xl font-black tracking-tight uppercase">Packaging Slip</h1>
                             <p className="text-sm font-bold text-slate-500 mt-1">Original for Recipient</p>
                         </div>
                         <div className="text-right">

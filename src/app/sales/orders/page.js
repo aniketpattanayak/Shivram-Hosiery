@@ -14,7 +14,6 @@ const OrderItemCard = ({ index, item, onChange, onRemove, productList }) => {
   return (
     <div className="bg-slate-50 rounded-xl border border-slate-200 p-5 relative group transition-all hover:shadow-md hover:border-blue-300">
       
-      {/* Delete Button */}
       <button 
         type="button" 
         onClick={() => onRemove(index)}
@@ -24,7 +23,6 @@ const OrderItemCard = ({ index, item, onChange, onRemove, productList }) => {
         <FiTrash2 />
       </button>
 
-      {/* Row 1: Product Search */}
       <div className="mb-4 pr-10">
         <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Product Name</label>
         <input
@@ -45,7 +43,6 @@ const OrderItemCard = ({ index, item, onChange, onRemove, productList }) => {
         </datalist>
       </div>
 
-      {/* Row 2: Specs & Delivery Date */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
         <div>
             <label className="text-[10px] font-bold text-slate-400 uppercase">Category</label>
@@ -64,7 +61,6 @@ const OrderItemCard = ({ index, item, onChange, onRemove, productList }) => {
             <div className="bg-slate-200/50 text-slate-600 font-medium text-xs px-3 py-2 rounded-lg border border-slate-200 h-9 flex items-center">{item.color || '-'}</div>
         </div>
         
-        {/* 🟢 NEW: Item Promise Date */}
         <div>
             <label className="text-[10px] font-bold text-blue-600 uppercase flex items-center gap-1"><FiCalendar /> Promise Date</label>
             <input 
@@ -76,30 +72,31 @@ const OrderItemCard = ({ index, item, onChange, onRemove, productList }) => {
         </div>
       </div>
 
-      {/* Row 3: Commercials */}
       <div className="flex items-end gap-4 border-t border-slate-200 pt-4">
         <div className="w-32">
             <label className="text-[10px] font-bold text-blue-600 uppercase mb-1 block">Quantity</label>
             <input 
-                type="number" min="1"
+                type="number"
                 value={item.qtyOrdered}
-                onChange={(e) => onChange(index, "qtyOrdered", Number(e.target.value))}
+                // 🟢 FIXED: Allows empty input during typing to prevent "0123" issue
+                onChange={(e) => onChange(index, "qtyOrdered", e.target.value === "" ? "" : Number(e.target.value))}
                 className="w-full bg-white border border-blue-200 text-slate-900 font-bold text-center rounded-lg px-2 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
             />
         </div>
         <div className="w-32">
             <label className="text-[10px] font-bold text-emerald-600 uppercase mb-1 block">Rate (₹)</label>
             <input 
-                type="number" min="0"
+                type="number"
                 value={item.unitPrice}
-                onChange={(e) => onChange(index, "unitPrice", Number(e.target.value))}
+                // 🟢 FIXED: Allows empty input during typing
+                onChange={(e) => onChange(index, "unitPrice", e.target.value === "" ? "" : Number(e.target.value))}
                 className="w-full bg-white border border-emerald-200 text-slate-900 font-bold text-right rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
             />
         </div>
         <div className="flex-grow text-right pb-2">
             <span className="text-xs font-bold text-slate-400 uppercase mr-2">Line Total</span>
             <span className="text-lg font-black text-slate-800">
-                ₹{((item.qtyOrdered || 0) * (item.unitPrice || 0)).toLocaleString()}
+                ₹{((Number(item.qtyOrdered) || 0) * (Number(item.unitPrice) || 0)).toLocaleString()}
             </span>
         </div>
       </div>
@@ -112,10 +109,9 @@ export default function NewOrderPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: "", msg: "" });
   
-  // Data
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]); 
-  const [allClients, setAllClients] = useState([]); // 🟢 Store All Clients for Search
+  const [allClients, setAllClients] = useState([]);
   const [wonLeads, setWonLeads] = useState([]);
   const [clientQuotes, setClientQuotes] = useState([]);
 
@@ -125,10 +121,10 @@ export default function NewOrderPage() {
     customerId: "", 
     deliveryDate: new Date().toISOString().split("T")[0],
     priority: "Medium",
-    advanceReceived: false, // 🟢 New Field
-    advanceAmount: 0,       // 🟢 New Field
+    advanceReceived: false,
+    advanceAmount: "", // 🟢 FIXED: Initialized as empty string
     items: [
-        { productName: "", category: "", subCategory: "", fabricType: "", color: "", qtyOrdered: 1, unitPrice: 0, promiseDate: "" }
+        { productName: "", category: "", subCategory: "", fabricType: "", color: "", qtyOrdered: 1, unitPrice: "", promiseDate: "" }
     ], 
   });
 
@@ -136,52 +132,36 @@ export default function NewOrderPage() {
     try {
       const [prodRes, leadsRes, ordersRes] = await Promise.all([
         api.get("/products"),
-        api.get("/sales/clients?limit=1000"), // Fetch more for dropdown
+        api.get("/sales/clients?limit=1000"),
         api.get("/sales/orders")
       ]);
-      
       setProducts(prodRes.data);
       setOrders(Array.isArray(ordersRes.data) ? ordersRes.data : []);
-
-      // Handle both Array and Object formats
       const rawClients = leadsRes.data;
       const clientList = Array.isArray(rawClients) ? rawClients : (rawClients.data || []);
-      
-      setAllClients(clientList); // 🟢 Store for Search
+      setAllClients(clientList);
       setWonLeads(clientList.filter(l => l.status === 'Order Won'));
-
     } catch (error) { console.error("Data load error", error); }
   };
 
   useEffect(() => { fetchInitData(); }, []);
 
   const financials = useMemo(() => {
-    const subTotal = formData.items.reduce((acc, item) => acc + ((item.qtyOrdered || 0) * (item.unitPrice || 0)), 0);
+    const subTotal = formData.items.reduce((acc, item) => acc + ((Number(item.qtyOrdered) || 0) * (Number(item.unitPrice) || 0)), 0);
     return { subTotal, grandTotal: subTotal };
   }, [formData.items]);
 
-  // --- HANDLERS ---
-  
-  // 🟢 NEW: Smart Customer Selection (Hybrid)
   const handleCustomerNameChange = (e) => {
       const val = e.target.value;
-      
-      // Try to find if this name exists in our database
       const existingClient = allClients.find(c => c.name.toLowerCase() === val.toLowerCase());
-      
       setFormData(prev => ({
           ...prev,
           customerName: val,
-          customerId: existingClient ? existingClient._id : "" // Set ID if found, else empty (New Customer)
+          customerId: existingClient ? existingClient._id : ""
       }));
-
-      // If existing client found, try to fetch quotes
-      if (existingClient) {
-          fetchQuotesForClient(val);
-      }
+      if (existingClient) fetchQuotesForClient(val);
   };
 
-  // Convert "Won Lead" button click
   const handleConvertLead = async (lead) => {
     setFormData(prev => ({ ...prev, customerName: lead.name, customerId: lead._id }));
     fetchQuotesForClient(lead.name);
@@ -208,7 +188,7 @@ export default function NewOrderPage() {
             subCategory: productMaster?.subCategory || "",
             fabricType: productMaster?.fabricType || "",
             color: productMaster?.color || "",
-            promiseDate: formData.deliveryDate // Default to main delivery date
+            promiseDate: formData.deliveryDate
         };
     });
     setFormData(prev => ({ ...prev, items: mappedItems }));
@@ -231,7 +211,7 @@ export default function NewOrderPage() {
   };
 
   const addItem = () => setFormData(prev => ({ 
-      ...prev, items: [...prev.items, { productName: "", qtyOrdered: 1, unitPrice: 0, promiseDate: "" }] 
+      ...prev, items: [...prev.items, { productName: "", qtyOrdered: 1, unitPrice: "", promiseDate: "" }] 
   }));
 
   const removeItem = (index) => {
@@ -245,10 +225,16 @@ export default function NewOrderPage() {
     setLoading(true);
     setStatus({ type: "", msg: "" });
 
-    // Clean payload (ensure customerId is null if empty string)
+    // 🟢 CLEAN PAYLOAD: Convert empty strings back to 0 for the database
     const payload = {
         ...formData,
-        customerId: formData.customerId || null
+        customerId: formData.customerId || null,
+        advanceAmount: Number(formData.advanceAmount) || 0,
+        items: formData.items.map(item => ({
+            ...item,
+            qtyOrdered: Number(item.qtyOrdered) || 0,
+            unitPrice: Number(item.unitPrice) || 0
+        }))
     };
 
     try {
@@ -259,13 +245,12 @@ export default function NewOrderPage() {
         }
         alert(`✅ Order #${res.data.order.orderId} Created!`);
         
-        // Reset
         setFormData({
           customerName: "", customerId: "",
           deliveryDate: new Date().toISOString().split("T")[0],
           priority: "Medium",
-          advanceReceived: false, advanceAmount: 0,
-          items: [{ productName: "", category: "", subCategory: "", fabricType: "", color: "", qtyOrdered: 1, unitPrice: 0, promiseDate: "" }],
+          advanceReceived: false, advanceAmount: "",
+          items: [{ productName: "", category: "", subCategory: "", fabricType: "", color: "", qtyOrdered: 1, unitPrice: "", promiseDate: "" }],
         });
         setClientQuotes([]);
         fetchInitData();
@@ -296,12 +281,10 @@ export default function NewOrderPage() {
 
       <form onSubmit={handleSubmit} className="space-y-8">
         
-        {/* Customer Section */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2"><div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><FiUser /></div> Customer Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                {/* 🟢 NEW: Hybrid Searchable Input */}
                 <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Customer Name</label>
                     <input 
@@ -340,7 +323,6 @@ export default function NewOrderPage() {
             </div>
         </div>
 
-        {/* Items Section */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2"><div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><FiBox /></div> Order Items</h3>
@@ -353,10 +335,8 @@ export default function NewOrderPage() {
             </div>
         </div>
 
-        {/* 🟢 NEW: Advance Payment & Financials */}
         <div className="flex flex-col md:flex-row justify-end gap-6">
             
-            {/* Advance Section */}
             <div className="w-full md:w-80 bg-orange-50 p-6 rounded-2xl border border-orange-100 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                     <label className="text-xs font-bold text-orange-800 uppercase">Adv. Received?</label>
@@ -368,22 +348,23 @@ export default function NewOrderPage() {
                     />
                 </div>
                 {formData.advanceReceived && (
-                    <div>
+                    <div className="animate-in slide-in-from-top-2 duration-300">
                         <label className="text-[10px] font-bold text-orange-600 uppercase mb-1 block">Advance Amount</label>
                         <div className="relative">
                             <span className="absolute left-3 top-3 text-orange-400 font-bold">₹</span>
                             <input 
                                 type="number" 
                                 value={formData.advanceAmount}
-                                onChange={(e) => setFormData({...formData, advanceAmount: Number(e.target.value)})}
+                                // 🟢 FIXED: Handle as string during typing to allow full deletion and prevent leading zeros
+                                onChange={(e) => setFormData({...formData, advanceAmount: e.target.value === "" ? "" : Number(e.target.value)})}
                                 className="w-full pl-8 p-2.5 bg-white border border-orange-200 rounded-lg font-bold text-orange-900 outline-none focus:ring-2 focus:ring-orange-300"
+                                placeholder="0"
                             />
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Totals Section */}
             <div className="w-full md:w-80 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                 <div className="flex justify-between text-sm font-medium text-slate-500"><span>Subtotal</span><span>₹{financials.subTotal.toLocaleString()}</span></div>
                 <div className="border-t border-slate-200 pt-3 flex justify-between items-center"><span className="font-bold text-slate-800">Grand Total</span><span className="text-2xl font-black text-slate-900">₹{financials.grandTotal.toLocaleString()}</span></div>
@@ -397,7 +378,6 @@ export default function NewOrderPage() {
         </div>
       </form>
 
-      {/* HISTORY TABLE */}
       <div className="border-t border-slate-200 pt-10 mt-10">
         <h2 className="text-xl font-extrabold text-slate-900 mb-6 flex items-center gap-2"><FiClock className="text-slate-400" /> Recent Order History</h2>
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">

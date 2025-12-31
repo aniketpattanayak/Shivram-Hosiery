@@ -4,7 +4,8 @@ import {
   FiPieChart, FiUserCheck, FiFileText, FiCreditCard, FiPlusSquare, FiActivity, FiTool,
   FiPackage, FiZap, 
   FiHome, FiClipboard, FiTrendingUp,
-  FiBarChart2, FiAlertTriangle, FiTarget // 🟢 Added for Intelligence Center
+  FiBarChart2, FiAlertTriangle, FiTarget,
+  FiRotateCcw, FiShield // 🟢 Added for Return Management & QC Hold
 } from "react-icons/fi";
 import { PiDress } from "react-icons/pi";
 
@@ -24,6 +25,7 @@ export const SYSTEM_MODULES = [
       { name: "Quotations", href: "/sales/quotes", icon: FiFileText },
       { name: "Sales Orders", href: "/sales/orders", icon: FiShoppingCart },
       { name: "Dispatch", href: "/dispatch", icon: FiTruck },
+      { name: "Return Request", href: "/returns", icon: FiRotateCcw }, // 🟢 NEW: Product Returns Page
       { name: "Log Expense", href: "/sales/expenses/new", icon: FiPlusSquare },
     ]
   },
@@ -56,8 +58,6 @@ export const SYSTEM_MODULES = [
       { name: "Full Kitting", href: "/kitting", icon: FiPackage, key: "production" }, 
       { name: "Production Floor", href: "/shop-floor", icon: FiPlay },
       { name: "Quality Control", href: "/qc", icon: FiSettings },
-      // 🟢 QC ADMIN GATE: Added to manage rejections and holds
-      { name: "QC Review (Admin)", href: "/qc-review", icon: FiAlertTriangle },
     ]
   },
   {
@@ -82,8 +82,8 @@ export const SYSTEM_MODULES = [
     icon: FiPieChart,
     key: "analytics", 
     items: [
-      // 🟢 STRATEGIC HUB: The 4-Tab Dashboard (Sales, Production, Vendor, User)
       { name: "Intelligence Hub", href: "/factory-intelligence", icon: FiTarget },
+      { name: "QC Hold/Returns", href: "/returns/admin", icon: FiShield }, // 🟢 NEW: Admin Approval Dashboard
       { name: "Reports Center", href: "/reports", icon: FiPieChart },
       { name: "Vendor Efficiency", href: "/reports/efficiency", icon: FiTrendingUp }, 
     ]
