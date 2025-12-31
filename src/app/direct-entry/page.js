@@ -147,7 +147,6 @@ export default function DirectStockEntryPage() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-                <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full text-slate-500"><FiArrowLeft size={24}/></button>
                 <div>
                     <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Direct Stock Entry</h1>
                     <p className="text-slate-500 text-sm font-medium">Manage Inward Stock with dynamic GST calculations.</p>
@@ -196,8 +195,8 @@ export default function DirectStockEntryPage() {
                                 <th className="p-5 w-[12%] text-center">Batch ID</th>
                                 <th className="p-5 w-[8%] text-center">Qty</th>
                                 <th className="p-5 w-[12%] text-right">Net Rate (₹)</th>
-                                <th className="p-5 w-[15%] text-center">Tax (GST)</th>
-                                <th className="p-5 w-[18%] text-right">Gross Total</th>
+                                <th className="p-5 w-[18%] text-center">Tax (GST)</th>
+                                <th className="p-5 w-[15%] text-right">Gross Total</th>
                                 <th className="p-5 w-[5%]"></th>
                             </tr>
                         </thead>
@@ -236,7 +235,7 @@ export default function DirectStockEntryPage() {
                                             <input type="checkbox" className="w-4 h-4 rounded accent-blue-600 cursor-pointer" checked={row.gstEnabled} onChange={() => handleRowChange(index, 'gstEnabled')}/>
                                             {row.gstEnabled && (
                                                 <div className="flex items-center bg-blue-50 border border-blue-100 rounded-lg px-2">
-                                                    <input type="number" className="w-8 p-1 bg-transparent font-black text-blue-700 text-xs outline-none text-center" value={row.gstPercent} onChange={(e) => handleRowChange(index, 'gstPercent', e.target.value)}/>
+                                                    <input type="number" className="w-12 p-1 bg-transparent font-black text-blue-700 text-xs outline-none text-center" value={row.gstPercent} onChange={(e) => handleRowChange(index, 'gstPercent', e.target.value)}/>
                                                     <span className="text-[10px] font-black text-blue-400">%</span>
                                                 </div>
                                             )}

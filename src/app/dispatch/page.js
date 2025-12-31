@@ -382,7 +382,7 @@ export default function LogisticsPage() {
                                             onClick={() => setPrintOrder(order)}
                                             className="text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg text-[10px] font-black uppercase flex items-center gap-2 mx-auto transition-all"
                                         >
-                                            <FiPrinter /> Reprint Challan
+                                            <FiPrinter /> Reprint Packaging Slip
                                         </button>
                                     </td>
                                 </>
